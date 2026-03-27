@@ -104,8 +104,14 @@
   max-height: 0;
   overflow: hidden;
   transition: max-height 0.22s ease;
-  min-width: 220px;
+  min-width: 0;
+  width: 0;
   /* background inherited from widget (#1a1a1a) */
+}
+
+#claude-status-widget.expanded #csm-body {
+  min-width: 220px;
+  width: auto;
 }
 
 #claude-status-widget.expanded #csm-body {

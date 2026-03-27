@@ -177,24 +177,41 @@
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  function makeEmpty(text) {
+    const div = document.createElement('div');
+    div.className = 'csm-empty';
+    div.textContent = text;
+    return div;
+  }
+
   function renderComponents(components) {
     lastComponents = components;
     const container = widget.querySelector('#csm-components');
     const L = LABELS[currentLang];
     const visible = components.filter(c => !c.group);
+    container.replaceChildren();
     if (!visible.length) {
-      container.innerHTML = `<div class="csm-empty">${L.noData}</div>`;
+      container.appendChild(makeEmpty(L.noData));
       return;
     }
-    container.innerHTML = visible.map(c => {
-      const color = STATUS_COLOR[c.status] ?? 'gray';
-      const label = L.status[c.status] ?? c.status;
-      return `<div class="csm-component">
-        <span class="csm-dot csm-${color}"></span>
-        <span class="csm-component-name">${escapeHtml(c.name)}</span>
-        <span class="csm-component-status">${label}</span>
-      </div>`;
-    }).join('');
+    for (const c of visible) {
+      const row = document.createElement('div');
+      row.className = 'csm-component';
+
+      const dot = document.createElement('span');
+      dot.className = `csm-dot csm-${STATUS_COLOR[c.status] ?? 'gray'}`;
+
+      const name = document.createElement('span');
+      name.className = 'csm-component-name';
+      name.textContent = c.name;
+
+      const status = document.createElement('span');
+      status.className = 'csm-component-status';
+      status.textContent = L.status[c.status] ?? c.status;
+
+      row.append(dot, name, status);
+      container.appendChild(row);
+    }
   }
 
   function updateTimestamp() {
@@ -215,8 +232,8 @@
 
   function applyError() {
     widget.querySelector('#csm-dot').className = 'csm-dot csm-gray';
-    widget.querySelector('#csm-components').innerHTML =
-      `<div class="csm-empty">${LABELS[currentLang].error}</div>`;
+    const container = widget.querySelector('#csm-components');
+    container.replaceChildren(makeEmpty(LABELS[currentLang].error));
     widget.querySelector('#csm-timestamp').textContent = LABELS[currentLang].fetchError;
   }
 
