@@ -25,6 +25,9 @@ const LABELS = {
     noIncidents: 'Keine aktuellen Vorfälle',
     noMaintenance: 'Keine geplanten Wartungen',
     noHistory: 'Keine aufgelösten Vorfälle in den letzten 7 Tagen',
+    uptimeHistory: '7-Tage-Verlauf',
+    dayNames: ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'],
+    today: 'Heute',
     loading: 'Wird geladen…',
     error: 'Daten nicht verfügbar',
     lastChecked: (t) => `Zuletzt geprüft: ${t} Uhr`,
@@ -69,6 +72,9 @@ const LABELS = {
     noIncidents: 'No active incidents',
     noMaintenance: 'No scheduled maintenance',
     noHistory: 'No resolved incidents in the last 7 days',
+    uptimeHistory: '7-Day History',
+    dayNames: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+    today: 'Today',
     loading: 'Loading…',
     error: 'Data unavailable',
     lastChecked: (t) => `Last checked: ${t}`,
@@ -148,6 +154,76 @@ function getOverallColor(components) {
 }
 
 // ── Render functions ─────────────────────────────────────────
+
+function renderUptimeChart(allIncidents, summaryData) {
+  const L = LABELS[currentLang];
+  const container = document.getElementById('p-uptime-bars');
+  container.replaceChildren();
+
+  const COLOR_PRIORITY = { red: 3, orange: 2, gray: 1, green: 0 };
+
+  // Map incident impact → color
+  function impactColor(impact) {
+    if (impact === 'major') return 'red';
+    if (impact === 'minor') return 'orange';
+    return 'gray'; // maintenance / none
+  }
+
+  const now = new Date();
+
+  for (let daysAgo = 6; daysAgo >= 0; daysAgo--) {
+    const day = new Date(now);
+    day.setUTCDate(now.getUTCDate() - daysAgo);
+    const dayStart = Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate());
+    const dayEnd   = dayStart + 86400000;
+
+    let color = 'green';
+
+    for (const inc of allIncidents) {
+      const incStart = new Date(inc.started_at).getTime();
+      const incEnd   = inc.resolved_at ? new Date(inc.resolved_at).getTime() : Date.now();
+      if (incStart < dayEnd && incEnd > dayStart) {
+        const c = impactColor(inc.impact);
+        if ((COLOR_PRIORITY[c] ?? 0) > (COLOR_PRIORITY[color] ?? 0)) color = c;
+      }
+    }
+
+    // For today also factor in live component status
+    if (daysAgo === 0) {
+      const compColor = getOverallColor(summaryData.components ?? []);
+      if ((COLOR_PRIORITY[compColor] ?? 0) > (COLOR_PRIORITY[color] ?? 0)) color = compColor;
+    }
+
+    // Tooltip text
+    const dateLabel = new Date(dayStart).toLocaleDateString(
+      currentLang === 'de' ? 'de-DE' : 'en-US',
+      { day: '2-digit', month: '2-digit', timeZone: 'UTC' }
+    );
+    const statusLabel = {
+      green:  L.compStatus.operational,
+      orange: L.compStatus.partial_outage,
+      red:    L.compStatus.major_outage,
+      gray:   L.compStatus.under_maintenance,
+    }[color];
+
+    const wrapper = el('div', 'p-uptime-bar-wrapper');
+    const bar     = el('div', `p-uptime-bar p-uptime-${color}`);
+    bar.title = `${dateLabel}: ${statusLabel}`;
+
+    const label = el('span', 'p-uptime-label');
+    if (daysAgo === 0) {
+      label.textContent = L.today;
+      label.classList.add('p-uptime-today');
+    } else {
+      label.textContent = L.dayNames[new Date(dayStart).getUTCDay()];
+    }
+
+    wrapper.append(bar, label);
+    container.appendChild(wrapper);
+  }
+
+  document.getElementById('p-uptime-title').textContent = L.uptimeHistory;
+}
 
 function renderComponents(components) {
   const L = LABELS[currentLang];
@@ -293,6 +369,7 @@ function renderAll(summaryData, incidentsData) {
   document.getElementById('p-dot').className = `p-dot p-${overallColor}`;
 
   renderComponents(components);
+  renderUptimeChart(allIncidents, summaryData);
   renderActiveIncidents(activeIncidents);
   renderScheduledMaintenance(maintenances);
   renderHistory(allIncidents);

@@ -162,6 +162,54 @@ body {
   color: var(--text-secondary);
 }
 
+/* ── Uptime chart ───────────────────────────────────────────── */
+
+#p-uptime-chart {
+  padding: 4px 14px 12px;
+}
+
+#p-uptime-bars {
+  display: flex;
+  gap: 4px;
+  align-items: flex-end;
+}
+
+.p-uptime-bar-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+.p-uptime-bar {
+  width: 100%;
+  height: 28px;
+  border-radius: 4px;
+  cursor: default;
+  transition: filter 0.1s ease;
+}
+
+.p-uptime-bar:hover {
+  filter: brightness(1.2);
+}
+
+.p-uptime-green  { background: var(--green);  box-shadow: 0 0 6px rgba(34,  197, 94,  0.25); }
+.p-uptime-orange { background: var(--orange); box-shadow: 0 0 6px rgba(249, 115, 22,  0.25); }
+.p-uptime-red    { background: var(--red);    box-shadow: 0 0 6px rgba(239, 68,  68,  0.25); }
+.p-uptime-gray   { background: var(--gray); }
+
+.p-uptime-label {
+  font-size: 9px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.p-uptime-today {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
 /* ── Incident cards ─────────────────────────────────────────── */
 
 .p-incident-card {
