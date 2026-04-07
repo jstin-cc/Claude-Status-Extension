@@ -148,7 +148,10 @@ This extension does **not** collect, store, or transmit any personal data.
 - No user data is sent to any server
 - No analytics or tracking of any kind
 - Network requests are read-only GETs to `https://status.anthropic.com/api/v2/`
-- Settings (language) are stored locally in the browser using `browser.storage.local` and never leave the device
+- Settings (language) are stored locally in the browser using `browser.storage.local` / `chrome.storage.local` and never leave the device
+
+Full privacy policy (required for Chrome Web Store): [privacy-policy.md](./privacy-policy.md)
+> Hosted URL: `https://jstin-cc.github.io/Claude-Status-Firefox-Extension/privacy-policy`
 
 ---
 
