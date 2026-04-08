@@ -130,19 +130,28 @@ async function maybeNotify(components, activeIncidents) {
     return;
   }
 
-  const worsened = isWorse(newStatus, lastOverallStatus);
+  const worsened  = isWorse(newStatus, lastOverallStatus);
+  const recovered = isRecovery(newStatus, lastOverallStatus);
   lastOverallStatus = newStatus;
-  if (!worsened) return;
+  if (!worsened && !recovered) return;
 
   const stored = await chrome.storage.local.get(['csm-notify', 'csm-lang']);
   if (!stored['csm-notify']) return;
 
   const lang = stored['csm-lang'] ?? 'de';
-  const msg  = activeIncidents.length
-    ? (lang === 'de'
-        ? `Aktiver Vorfall: ${activeIncidents[0].name}`
-        : `Active incident: ${activeIncidents[0].name}`)
-    : (lang === 'de' ? 'Dienststatus hat sich verschlechtert.' : 'Service status has degraded.');
+  let msg;
+
+  if (recovered) {
+    msg = lang === 'de'
+      ? 'Alle Dienste wieder operational.'
+      : 'All services back to operational.';
+  } else {
+    msg = activeIncidents.length
+      ? (lang === 'de'
+          ? `Aktiver Vorfall: ${activeIncidents[0].name}`
+          : `Active incident: ${activeIncidents[0].name}`)
+      : (lang === 'de' ? 'Dienststatus hat sich verschlechtert.' : 'Service status has degraded.');
+  }
 
   chrome.notifications.create({
     type: 'basic',
@@ -155,4 +164,9 @@ async function maybeNotify(components, activeIncidents) {
 function isWorse(newStatus, oldStatus) {
   const rank = { green: 0, operational: 0, gray: 1, degraded: 2, orange: 2, major: 3, red: 3 };
   return (rank[newStatus] ?? 0) > (rank[oldStatus] ?? 0);
+}
+
+function isRecovery(newStatus, oldStatus) {
+  const rank = { green: 0, operational: 0, gray: 1, degraded: 2, orange: 2, major: 3, red: 3 };
+  return (rank[newStatus] ?? 0) === 0 && (rank[oldStatus] ?? 0) >= 2;
 }

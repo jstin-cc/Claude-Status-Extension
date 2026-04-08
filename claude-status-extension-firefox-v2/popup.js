@@ -106,8 +106,11 @@ let cachedResponse = null;
 function applyTheme(theme) {
   currentTheme = theme;
   document.documentElement.dataset.theme = theme;
+  const icon = theme === 'dark' ? '🌙' : '☀️';
   const themeBtn = document.getElementById('p-theme-btn');
-  if (themeBtn) themeBtn.textContent = theme === 'dark' ? '🌙' : '☀️';
+  if (themeBtn) themeBtn.textContent = icon;
+  const settingBtn = document.getElementById('p-setting-theme-btn');
+  if (settingBtn) settingBtn.textContent = icon;
 }
 
 // ── Helpers ──────────────────────────────────────────────────
@@ -434,9 +437,12 @@ document.getElementById('p-theme-btn').addEventListener('click', (e) => {
   const next = currentTheme === 'dark' ? 'light' : 'dark';
   applyTheme(next);
   chrome.storage.local.set({ 'csm-theme': next });
-  // Sync settings toggle if visible
-  const t = document.getElementById('p-setting-theme');
-  if (t) t.checked = (next === 'light');
+});
+
+document.getElementById('p-setting-theme-btn').addEventListener('click', () => {
+  const next = currentTheme === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  chrome.storage.local.set({ 'csm-theme': next });
 });
 
 // ── Settings view ─────────────────────────────────────────────
@@ -447,7 +453,7 @@ const LABELS_SETTINGS = {
     theme: 'Erscheinungsbild',
     themeDesc: 'Dark / Light Mode',
     notify: 'Benachrichtigungen',
-    notifyDesc: 'Bei Statusverschlechterung',
+    notifyDesc: 'Bei Störung & Erholung',
     lang: 'Sprache',
     interval: 'Aktualisierungsintervall',
     intervalDesc: 'Wie oft Status geprüft wird',
@@ -458,7 +464,7 @@ const LABELS_SETTINGS = {
     theme: 'Appearance',
     themeDesc: 'Dark / Light Mode',
     notify: 'Notifications',
-    notifyDesc: 'On status degradation',
+    notifyDesc: 'On incident & recovery',
     lang: 'Language',
     interval: 'Refresh interval',
     intervalDesc: 'How often status is checked',
@@ -489,7 +495,7 @@ function openSettings() {
 
   // Load current values
   chrome.storage.local.get(['csm-theme', 'csm-notify', 'csm-lang', 'csm-poll-interval'], (stored) => {
-    document.getElementById('p-setting-theme').checked    = (stored['csm-theme'] === 'light');
+    document.getElementById('p-setting-theme-btn').textContent = (stored['csm-theme'] === 'light') ? '☀️' : '🌙';
     document.getElementById('p-setting-notify').checked   = !!stored['csm-notify'];
     document.getElementById('p-setting-lang').value       = stored['csm-lang'] ?? 'de';
     document.getElementById('p-setting-interval').value   = String(stored['csm-poll-interval'] ?? '1');
@@ -508,11 +514,6 @@ document.getElementById('p-settings-btn').addEventListener('click', (e) => {
 
 document.getElementById('p-settings-back').addEventListener('click', closeSettings);
 
-document.getElementById('p-setting-theme').addEventListener('change', (e) => {
-  const next = e.target.checked ? 'light' : 'dark';
-  applyTheme(next);
-  chrome.storage.local.set({ 'csm-theme': next });
-});
 
 document.getElementById('p-setting-notify').addEventListener('change', (e) => {
   chrome.storage.local.set({ 'csm-notify': e.target.checked });

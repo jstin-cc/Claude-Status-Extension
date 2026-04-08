@@ -1,25 +1,62 @@
+/* ── Theme variables ──────────────────────────────────────── */
+
 #claude-status-widget {
-  --bg: #1a1a1a;
-  --surface: #2a2a2a;
-  --border: rgba(255, 255, 255, 0.1);
-  --text-primary: #f5f5f5;
-  --text-secondary: #a0a0a0;
+  /* Dark (glassmorphism) */
+  --bg: rgba(18, 18, 18, 0.72);
+  --header-bg: rgba(40, 40, 38, 0.85);
+  --header-hover: rgba(55, 55, 52, 0.9);
+  --surface: rgba(255, 255, 255, 0.06);
+  --border: rgba(255, 255, 255, 0.13);
+  --text-primary: #f0f0f0;
+  --text-secondary: #9a9a9a;
+  --link: #60a5fa;
   --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --green: #22c55e;
   --orange: #f97316;
   --red: #ef4444;
   --gray: #6b7280;
+}
 
+#claude-status-widget[data-theme="light"] {
+  /* Light (glassmorphism) */
+  --bg: rgba(255, 255, 255, 0.68);
+  --header-bg: rgba(240, 240, 238, 0.88);
+  --header-hover: rgba(225, 225, 222, 0.95);
+  --surface: rgba(0, 0, 0, 0.04);
+  --border: rgba(0, 0, 0, 0.1);
+  --text-primary: #111111;
+  --text-secondary: #555555;
+  --link: #2563eb;
+  --green: #16a34a;
+  --orange: #ea6c00;
+  --red: #dc2626;
+  --gray: #4b5563;
+}
+
+/* Smooth theme transition */
+#claude-status-widget,
+#claude-status-widget *,
+#csm-lang-menu {
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* ── Widget ─────────────────────────────────────────────────── */
+
+#claude-status-widget {
   position: fixed;
-  bottom: 12px;
-  right: 12px;
+  bottom: 16px;
+  right: 16px;
   z-index: 2147483647;
   min-width: 0;
   max-width: 320px;
   background: var(--bg);
+  backdrop-filter: blur(14px) saturate(180%);
+  -webkit-backdrop-filter: blur(14px) saturate(180%);
   border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  border-radius: 20px;
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.35),
+    0 1px 0 rgba(255, 255, 255, 0.07) inset;
   font-family: var(--font);
   font-size: 13px;
   color: var(--text-primary);
@@ -29,28 +66,35 @@
   flex-direction: column;
 }
 
+/* Light mode: lighter shadow */
+#claude-status-widget[data-theme="light"] {
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.14),
+    0 1px 0 rgba(255, 255, 255, 0.8) inset;
+}
+
 /* ── Header ─────────────────────────────────── */
 #csm-header {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 5px 10px;
+  gap: 7px;
+  padding: 7px 12px;
   cursor: pointer;
-  background: #30302e;
+  background: var(--header-bg);
   white-space: nowrap;
-  transition: background 0.15s ease;
-  /* No border-radius — widget clips everything uniformly */
+  border-radius: 20px; /* Pill when collapsed */
+  transition: background 0.2s ease, border-radius 0.22s ease;
 }
 
 #csm-header:hover {
-  background: #3a3a38;
+  background: var(--header-hover);
 }
 
-/* When expanded: stretch to full width so lang selector goes to the right */
 #claude-status-widget.expanded #csm-header {
   display: flex;
   width: 100%;
   box-sizing: border-box;
+  border-radius: 20px 20px 0 0; /* Flat bottom when expanded */
 }
 
 #csm-title {
@@ -65,18 +109,25 @@
   line-height: 1;
 }
 
-/* ── Language selector (inside header, only when expanded) ── */
-#csm-lang-selector {
+/* ── Header controls (lang + theme) shown only when expanded ── */
+#csm-header-controls {
   display: none;
+  align-items: center;
+  gap: 2px;
   margin-left: auto;
 }
 
-#claude-status-widget.expanded #csm-lang-selector {
+#claude-status-widget.expanded #csm-header-controls {
+  display: flex;
+}
+
+#csm-lang-selector {
   display: flex;
   align-items: center;
 }
 
-#csm-lang-btn {
+#csm-lang-btn,
+#csm-theme-btn {
   background: none;
   border: none;
   color: var(--text-secondary);
@@ -90,8 +141,9 @@
   line-height: 1;
 }
 
-#csm-lang-btn:hover {
-  background: rgba(255, 255, 255, 0.1);
+#csm-lang-btn:hover,
+#csm-theme-btn:hover {
+  background: rgba(128, 128, 128, 0.15);
 }
 
 #csm-lang-arrow {
@@ -99,26 +151,27 @@
   color: var(--text-secondary);
 }
 
-/* ── Body (animates open/closed via max-height) ── */
+/* ── Body (CSS grid animation instead of max-height hack) ── */
 #csm-body {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.22s ease;
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.22s ease;
   min-width: 0;
   width: 0;
-  /* background inherited from widget (#1a1a1a) */
 }
 
 #claude-status-widget.expanded #csm-body {
+  grid-template-rows: 1fr;
   min-width: 220px;
   width: auto;
 }
 
-#claude-status-widget.expanded #csm-body {
-  max-height: 400px;
+#csm-body-inner {
+  overflow: hidden;
+  padding: 0;
 }
 
-#csm-body-inner {
+#claude-status-widget.expanded #csm-body-inner {
   padding: 8px 0 4px;
 }
 
@@ -135,7 +188,6 @@
   gap: 8px;
   padding: 5px 8px;
   border-radius: 6px;
-  transition: background 0.1s ease;
 }
 
 .csm-component:hover {
@@ -180,7 +232,7 @@
 
 #csm-link {
   font-size: 11px;
-  color: #60a5fa;
+  color: var(--link);
   text-decoration: none;
 }
 
@@ -202,23 +254,42 @@
 .csm-red    { background: var(--red);    box-shadow: 0 0 4px var(--red); }
 .csm-gray   { background: var(--gray); }
 
+/* ── Pulse animation (incidents) ─────────────── */
+@keyframes csm-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+.csm-dot.csm-pulsing {
+  animation: csm-pulse 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .csm-dot.csm-pulsing { animation: none; }
+  #claude-status-widget,
+  #claude-status-widget *,
+  #csm-lang-menu { transition: none !important; }
+}
+
 /* ── Scrollbar ───────────────────────────────── */
 #csm-components::-webkit-scrollbar { width: 4px; }
 #csm-components::-webkit-scrollbar-track { background: transparent; }
 #csm-components::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(128, 128, 128, 0.3);
   border-radius: 2px;
 }
 
-/* ── Lang dropdown (appended to body, position: fixed via JS) ── */
+/* ── Lang dropdown ───────────────────────────── */
 #csm-lang-menu {
   position: fixed;
-  background: #2a2a2a;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 7px;
+  background: rgba(28, 28, 28, 0.82);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
   overflow: hidden;
   min-width: 120px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   z-index: 2147483647;
   display: none;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -232,7 +303,7 @@
   padding: 7px 11px;
   cursor: pointer;
   font-size: 12px;
-  color: #f5f5f5;
+  color: var(--text-primary, #f5f5f5);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -240,9 +311,9 @@
 }
 
 .csm-lang-option:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(128, 128, 128, 0.1);
 }
 
 .csm-lang-option.active {
-  color: #60a5fa;
+  color: var(--link, #60a5fa);
 }

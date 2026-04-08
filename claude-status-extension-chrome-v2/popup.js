@@ -1,20 +1,6 @@
 'use strict';
 
-const STATUS_COLOR = {
-  major_outage: 'red',
-  partial_outage: 'orange',
-  degraded_performance: 'orange',
-  under_maintenance: 'gray',
-  operational: 'green',
-};
-
-const STATUS_PRIORITY = {
-  major_outage: 4,
-  partial_outage: 3,
-  degraded_performance: 2,
-  under_maintenance: 1,
-  operational: 0,
-};
+// STATUS_COLOR, STATUS_PRIORITY, getOverallColor — from shared.js
 
 const LABELS = {
   de: {
@@ -113,8 +99,19 @@ const LABELS = {
   },
 };
 
-let currentLang = 'de';
+let currentLang  = 'de';
+let currentTheme = 'dark';
 let cachedResponse = null;
+
+function applyTheme(theme) {
+  currentTheme = theme;
+  document.documentElement.dataset.theme = theme;
+  const icon = theme === 'dark' ? '🌙' : '☀️';
+  const themeBtn = document.getElementById('p-theme-btn');
+  if (themeBtn) themeBtn.textContent = icon;
+  const settingBtn = document.getElementById('p-setting-theme-btn');
+  if (settingBtn) settingBtn.textContent = icon;
+}
 
 // ── Helpers ──────────────────────────────────────────────────
 
@@ -142,16 +139,7 @@ function formatTimeRange(fromStr, toStr) {
   return `${new Date(fromStr).toLocaleTimeString(locale, opts)} – ${new Date(toStr).toLocaleTimeString(locale, opts)} UTC`;
 }
 
-function getOverallColor(components) {
-  let maxPriority = -1;
-  let worstStatus = 'operational';
-  for (const c of components) {
-    if (c.group) continue;
-    const p = STATUS_PRIORITY[c.status] ?? 0;
-    if (p > maxPriority) { maxPriority = p; worstStatus = c.status; }
-  }
-  return STATUS_COLOR[worstStatus] ?? 'gray';
-}
+// getOverallColor — from shared.js
 
 // ── Render functions ─────────────────────────────────────────
 
@@ -366,7 +354,8 @@ function renderAll(summaryData, incidentsData) {
   const overallColor = activeIncidents.length > 0
     ? (activeIncidents.some((i) => i.impact === 'major') ? 'red' : 'orange')
     : getOverallColor(components);
-  document.getElementById('p-dot').className = `p-dot p-${overallColor}`;
+  const pulse = overallColor === 'red' || overallColor === 'orange';
+  document.getElementById('p-dot').className = `p-dot p-${overallColor}${pulse ? ' p-pulsing' : ''}`;
 
   renderComponents(components);
   renderUptimeChart(allIncidents, summaryData);
@@ -407,8 +396,9 @@ function requestAndRender() {
 
 // ── Init ─────────────────────────────────────────────────────
 
-chrome.storage.local.get(['csm-lang'], (stored) => {
-  if (stored['csm-lang']) currentLang = stored['csm-lang'];
+chrome.storage.local.get(['csm-lang', 'csm-theme'], (stored) => {
+  if (stored['csm-lang'])  currentLang = stored['csm-lang'];
+  if (stored['csm-theme']) applyTheme(stored['csm-theme']);
   updateLangUI();
   document.getElementById('p-components').appendChild(
     el('div', 'p-empty', LABELS[currentLang].loading)
@@ -438,4 +428,108 @@ document.querySelectorAll('.p-lang-option').forEach((opt) => {
 
 document.addEventListener('click', () => {
   document.getElementById('p-lang-menu').classList.remove('open');
+});
+
+// ── Theme toggle ──────────────────────────────────────────────
+
+document.getElementById('p-theme-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const next = currentTheme === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  chrome.storage.local.set({ 'csm-theme': next });
+});
+
+document.getElementById('p-setting-theme-btn').addEventListener('click', () => {
+  const next = currentTheme === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+  chrome.storage.local.set({ 'csm-theme': next });
+});
+
+// ── Settings view ─────────────────────────────────────────────
+
+const LABELS_SETTINGS = {
+  de: {
+    title: 'Einstellungen',
+    theme: 'Erscheinungsbild',
+    themeDesc: 'Dark / Light Mode',
+    notify: 'Benachrichtigungen',
+    notifyDesc: 'Bei Störung & Erholung',
+    lang: 'Sprache',
+    interval: 'Aktualisierungsintervall',
+    intervalDesc: 'Wie oft Status geprüft wird',
+    intervals: { '0.5': '30 Sek.', '1': '1 Min.', '2': '2 Min.', '5': '5 Min.' },
+  },
+  en: {
+    title: 'Settings',
+    theme: 'Appearance',
+    themeDesc: 'Dark / Light Mode',
+    notify: 'Notifications',
+    notifyDesc: 'On incident & recovery',
+    lang: 'Language',
+    interval: 'Refresh interval',
+    intervalDesc: 'How often status is checked',
+    intervals: { '0.5': '30 sec', '1': '1 min', '2': '2 min', '5': '5 min' },
+  },
+};
+
+function updateSettingsLabels() {
+  const S = LABELS_SETTINGS[currentLang];
+  document.getElementById('p-settings-title').textContent = S.title;
+  document.getElementById('p-label-theme').textContent    = S.theme;
+  document.getElementById('p-desc-theme').textContent     = S.themeDesc;
+  document.getElementById('p-label-notify').textContent   = S.notify;
+  document.getElementById('p-desc-notify').textContent    = S.notifyDesc;
+  document.getElementById('p-label-lang').textContent     = S.lang;
+  document.getElementById('p-label-interval').textContent = S.interval;
+  document.getElementById('p-desc-interval').textContent  = S.intervalDesc;
+  const sel = document.getElementById('p-setting-interval');
+  Array.from(sel.options).forEach(opt => {
+    opt.textContent = S.intervals[opt.value] ?? opt.value;
+  });
+}
+
+function openSettings() {
+  document.getElementById('p-main-view').classList.add('hidden');
+  document.getElementById('p-settings-view').classList.add('active');
+  updateSettingsLabels();
+
+  // Load current values
+  chrome.storage.local.get(['csm-theme', 'csm-notify', 'csm-lang', 'csm-poll-interval'], (stored) => {
+    document.getElementById('p-setting-theme-btn').textContent = (stored['csm-theme'] === 'light') ? '☀️' : '🌙';
+    document.getElementById('p-setting-notify').checked   = !!stored['csm-notify'];
+    document.getElementById('p-setting-lang').value       = stored['csm-lang'] ?? 'de';
+    document.getElementById('p-setting-interval').value   = String(stored['csm-poll-interval'] ?? '1');
+  });
+}
+
+function closeSettings() {
+  document.getElementById('p-settings-view').classList.remove('active');
+  document.getElementById('p-main-view').classList.remove('hidden');
+}
+
+document.getElementById('p-settings-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  openSettings();
+});
+
+document.getElementById('p-settings-back').addEventListener('click', closeSettings);
+
+
+document.getElementById('p-setting-notify').addEventListener('change', (e) => {
+  chrome.storage.local.set({ 'csm-notify': e.target.checked });
+});
+
+document.getElementById('p-setting-lang').addEventListener('change', (e) => {
+  const lang = e.target.value;
+  currentLang = lang;
+  chrome.storage.local.set({ 'csm-lang': lang });
+  updateLangUI();
+  updateSettingsLabels();
+  if (cachedResponse) renderAll(cachedResponse.summary ?? {}, cachedResponse.incidents ?? {});
+});
+
+document.getElementById('p-setting-interval').addEventListener('change', (e) => {
+  const val = Number(e.target.value);
+  chrome.storage.local.set({ 'csm-poll-interval': val });
+  // background.js listens to storage changes and reconfigures the alarm
 });
