@@ -242,6 +242,23 @@ body {
   transform: translateX(16px);
 }
 
+/* ── Theme icon button (settings row) ───────────────────────── */
+
+.p-theme-icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.p-theme-icon-btn:hover {
+  background: rgba(128, 128, 128, 0.15);
+}
+
 /* ── Dropdown select ─────────────────────────────────────────── */
 
 .p-select {

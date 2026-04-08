@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+
+  <!-- ── Main View ─────────────────────────────────── -->
+  <div id="p-main-view">
+
+    <div id="p-header">
+      <span id="p-dot" class="p-dot p-gray" role="img" aria-label="Status"></span>
+      <span id="p-title">Claude Status</span>
+      <div id="p-header-actions">
+        <div id="p-lang-selector">
+          <button id="p-lang-btn" aria-label="Sprache wählen" aria-haspopup="listbox">
+            <span id="p-lang-flag">🇩🇪</span>
+            <span>▾</span>
+          </button>
+          <div id="p-lang-menu" role="listbox">
+            <div class="p-lang-option" data-lang="de" role="option">🇩🇪 Deutsch</div>
+            <div class="p-lang-option" data-lang="en" role="option">🇺🇸 English</div>
+          </div>
+        </div>
+        <button id="p-theme-btn" title="Theme wechseln" aria-label="Theme wechseln">🌙</button>
+        <button id="p-settings-btn" title="Einstellungen" aria-label="Einstellungen öffnen">⚙</button>
+      </div>
+    </div>
+
+    <div class="p-section" id="p-components-section">
+      <div class="p-section-header">
+        <span class="p-section-title" id="p-components-title">Komponenten</span>
+      </div>
+      <div id="p-components"></div>
+    </div>
+
+    <div class="p-section" id="p-uptime-section">
+      <div class="p-section-header">
+        <span class="p-section-title" id="p-uptime-title">7-Tage-Verlauf</span>
+      </div>
+      <div id="p-uptime-chart">
+        <div id="p-uptime-bars" role="img" aria-label="Uptime-Verlauf der letzten 7 Tage"></div>
+      </div>
+    </div>
+
+    <div class="p-section" id="p-incidents-section">
+      <div class="p-section-header">
+        <span class="p-section-title" id="p-active-title">Aktive Vorfälle</span>
+        <span id="p-active-count" class="p-badge" style="display:none">0</span>
+      </div>
+      <div id="p-active-incidents" role="list"></div>
+    </div>
+
+    <div class="p-section" id="p-maintenance-section">
+      <div class="p-section-header">
+        <span class="p-section-title" id="p-maint-title">Geplante Wartung</span>
+        <span id="p-maint-count" class="p-badge" style="display:none">0</span>
+      </div>
+      <div id="p-maintenance" role="list"></div>
+    </div>
+
+    <div class="p-section" id="p-history-section">
+      <div class="p-section-header">
+        <span class="p-section-title" id="p-history-title">Letzte Vorfälle</span>
+      </div>
+      <div id="p-history" role="list"></div>
+      <div style="height:4px"></div>
+    </div>
+
+    <div id="p-footer">
+      <span id="p-timestamp" role="status" aria-live="polite"></span>
+      <a id="p-link" href="https://status.anthropic.com" target="_blank" rel="noopener">status.anthropic.com ↗</a>
+    </div>
+
+  </div><!-- /#p-main-view -->
+
+  <!-- ── Settings View ──────────────────────────────── -->
+  <div id="p-settings-view">
+
+    <div id="p-settings-header">
+      <button id="p-settings-back" aria-label="Zurück">←</button>
+      <span id="p-settings-title">Einstellungen</span>
+    </div>
+
+    <div class="p-setting-row">
+      <div class="p-setting-info">
+        <div class="p-setting-label" id="p-label-theme">Erscheinungsbild</div>
+        <div class="p-setting-desc" id="p-desc-theme">Dark / Light Mode</div>
+      </div>
+      <button id="p-setting-theme-btn" class="p-theme-icon-btn" aria-label="Theme wechseln"></button>
+    </div>
+
+    <div class="p-setting-row">
+      <div class="p-setting-info">
+        <div class="p-setting-label" id="p-label-notify">Benachrichtigungen</div>
+        <div class="p-setting-desc" id="p-desc-notify">Bei Statusverschlechterung</div>
+      </div>
+      <label class="p-toggle" aria-labelledby="p-label-notify">
+        <input type="checkbox" id="p-setting-notify">
+        <span class="p-toggle-track"></span>
+      </label>
+    </div>
+
+    <div class="p-setting-row">
+      <div class="p-setting-info">
+        <div class="p-setting-label" id="p-label-lang">Sprache</div>
+      </div>
+      <select id="p-setting-lang" class="p-select" aria-labelledby="p-label-lang">
+        <option value="de">🇩🇪 Deutsch</option>
+        <option value="en">🇺🇸 English</option>
+      </select>
+    </div>
+
+    <div class="p-setting-row">
+      <div class="p-setting-info">
+        <div class="p-setting-label" id="p-label-interval">Aktualisierungsintervall</div>
+        <div class="p-setting-desc" id="p-desc-interval">Wie oft Status geprüft wird</div>
+      </div>
+      <select id="p-setting-interval" class="p-select" aria-labelledby="p-label-interval">
+        <option value="0.5">30 Sek.</option>
+        <option value="1" selected>1 Min.</option>
+        <option value="2">2 Min.</option>
+        <option value="5">5 Min.</option>
+      </select>
+    </div>
+
+  </div><!-- /#p-settings-view -->
+
+  <script src="shared.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

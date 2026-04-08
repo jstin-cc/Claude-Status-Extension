@@ -4,17 +4,38 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Firefox Manifest V3 extension that displays Anthropic's real-time service status as a widget on claude.ai. No build system, no framework dependencies — pure vanilla JavaScript and CSS.
+Firefox and Chrome Manifest V3 extension that displays Anthropic's real-time service status as a widget on claude.ai. No build system, no framework dependencies — pure vanilla JavaScript and CSS.
+
+## Repository Structure
+
+```
+src/                              ← shared source — edit here
+claude-status-extension-firefox/  ← Firefox v1 (legacy)
+claude-status-extension-firefox-v2/ ← Firefox v2 (build target)
+claude-status-extension-chrome-v2/  ← Chrome v2 (build target)
+dist/                             ← packaged releases (.zip, .xpi)
+sync.ps1                          ← propagates src/ to both v2 extensions
+```
+
+**Workflow:** Edit files in `src/`, then run `.\sync.ps1` to sync to both extension directories. Only `manifest.json` in each extension folder is browser-specific and not overwritten by sync.
 
 ## Development Workflow
 
-### Loading the Extension (Firefox)
+### Loading the Extension (Firefox v2)
 1. Navigate to `about:debugging` → "This Firefox" → "Load Temporary Add-on…"
-2. Select `claude-status-extension/manifest.json`
+2. Select `claude-status-extension-firefox-v2/manifest.json`
+
+### Loading the Extension (Chrome v2)
+1. Navigate to `chrome://extensions` → Enable "Developer mode" → "Load unpacked"
+2. Select the `claude-status-extension-chrome-v2/` folder
 
 ### Packaging for Distribution
 ```powershell
-Compress-Archive -Path "claude-status-extension/*" -DestinationPath "claude-status-monitor-1.0.zip" -Force
+# Firefox v2
+Compress-Archive -Path "claude-status-extension-firefox-v2/*" -DestinationPath "dist/claude-status-monitor-2.0.zip" -Force
+
+# Chrome v2
+Compress-Archive -Path "claude-status-extension-chrome-v2/*" -DestinationPath "dist/claude-status-monitor-chrome-2.0.zip" -Force
 ```
 
 ### Testing
@@ -55,6 +76,6 @@ Always use `textContent` / `createElement` / `appendChild`. Never use `innerHTML
 
 ## Key Constraints
 
-- **Firefox only** — uses `browser.*` APIs with `chrome.*` aliases; strict_min_version 140 desktop / 142 Android
-- **No tracking** — the only outbound request is the GET to status.anthropic.com
+- **Firefox + Chrome** — uses `chrome.*` APIs (Firefox aliases them from `browser.*`); Firefox strict_min_version 140 desktop / 142 Android
+- **No tracking** — the only outbound requests are to status.anthropic.com
 - **AMO compliance** — Mozilla Add-ons review requires safe DOM methods and explicit `browser_specific_settings` in manifest
