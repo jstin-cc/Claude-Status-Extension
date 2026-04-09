@@ -3,7 +3,7 @@
 # Only manifest.json is browser-specific and NOT overwritten.
 
 $shared  = @("shared.js", "content.js", "content.css", "popup.js", "popup.html", "popup.css", "background.js")
-$targets = @("claude-status-extension-firefox-v2", "claude-status-extension-chrome-v2")
+$targets = @("claude-status-extension-firefox-v3", "claude-status-extension-chrome-v3")
 
 $root = $PSScriptRoot
 

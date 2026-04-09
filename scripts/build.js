@@ -92,12 +92,12 @@ const CHROME_OVERRIDES = {
 
 const TARGETS = {
   firefox: {
-    dir: 'claude-status-extension-firefox-v2',
+    dir: 'claude-status-extension-firefox-v3',
     overrides: FIREFOX_OVERRIDES,
     zipName: `claude-status-monitor-${version}.zip`,
   },
   chrome: {
-    dir: 'claude-status-extension-chrome-v2',
+    dir: 'claude-status-extension-chrome-v3',
     overrides: CHROME_OVERRIDES,
     zipName: `claude-status-monitor-chrome-${version}.zip`,
   },
