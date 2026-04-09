@@ -12,8 +12,8 @@ Firefox and Chrome Manifest V3 extension that displays Anthropic's real-time ser
 src/                              ← shared source — edit here
 scripts/build.js                  ← build script (sync + manifest gen + zip)
 tests/                            ← unit tests (vitest)
-claude-status-extension-firefox-v2/ ← Firefox v2 (build target)
-claude-status-extension-chrome-v2/  ← Chrome v2 (build target)
+claude-status-extension-firefox-v3/ ← Firefox v2 (build target)
+claude-status-extension-chrome-v3/  ← Chrome v2 (build target)
 dist/                             ← packaged releases (.zip)
 sync.ps1                          ← legacy sync (PowerShell, still works)
 ```
@@ -24,11 +24,11 @@ sync.ps1                          ← legacy sync (PowerShell, still works)
 
 ### Loading the Extension (Firefox v2)
 1. Navigate to `about:debugging` → "This Firefox" → "Load Temporary Add-on…"
-2. Select `claude-status-extension-firefox-v2/manifest.json`
+2. Select `claude-status-extension-firefox-v3/manifest.json`
 
 ### Loading the Extension (Chrome v2)
 1. Navigate to `chrome://extensions` → Enable "Developer mode" → "Load unpacked"
-2. Select the `claude-status-extension-chrome-v2/` folder
+2. Select the `claude-status-extension-chrome-v3/` folder
 
 ### Build & Package
 ```bash

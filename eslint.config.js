@@ -105,8 +105,8 @@ export default [
   },
   {
     ignores: [
-      'claude-status-extension-firefox-v2/**',
-      'claude-status-extension-chrome-v2/**',
+      'claude-status-extension-firefox-v3/**',
+      'claude-status-extension-chrome-v3/**',
       'dist/**',
       'node_modules/**',
     ],

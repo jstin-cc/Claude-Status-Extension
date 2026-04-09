@@ -84,12 +84,12 @@ Install from [addons.mozilla.org](https://addons.mozilla.org) or sideload the `.
 ### Firefox — Manual (Developer)
 1. Clone or download this repository
 2. Open Firefox → `about:debugging` → **"This Firefox"** → **"Load Temporary Add-on…"**
-3. Select `claude-status-extension-firefox-v2/manifest.json`
+3. Select `claude-status-extension-firefox-v3/manifest.json`
 4. Open [claude.ai](https://claude.ai) — the widget appears in the bottom-right corner
 
 ### Chrome — Manual (Developer)
 1. Open Chrome → `chrome://extensions` → enable **Developer mode**
-2. Click **"Load unpacked"** → select the `claude-status-extension-chrome-v2/` folder
+2. Click **"Load unpacked"** → select the `claude-status-extension-chrome-v3/` folder
 
 ---
 
@@ -132,8 +132,8 @@ Install from [addons.mozilla.org](https://addons.mozilla.org) or sideload the `.
 src/                                  ← shared source — edit here
 scripts/build.js                      ← build script (sync + manifest gen + zip)
 tests/                                ← unit tests (vitest)
-claude-status-extension-firefox-v2/   ← Firefox build target
-claude-status-extension-chrome-v2/    ← Chrome build target
+claude-status-extension-firefox-v3/   ← Firefox build target
+claude-status-extension-chrome-v3/    ← Chrome build target
 dist/                                 ← packaged releases (.zip)
 ```
 

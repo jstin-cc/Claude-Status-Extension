@@ -43,9 +43,9 @@ jobs:
 
       - name: Verify manifests generated
         run: |
-          diff <(cat claude-status-extension-firefox-v2/manifest.json) /dev/null > /dev/null 2>&1 && exit 1 || true
-          grep '"version"' claude-status-extension-firefox-v2/manifest.json
-          grep '"version"' claude-status-extension-chrome-v2/manifest.json
+          diff <(cat claude-status-extension-firefox-v3/manifest.json) /dev/null > /dev/null 2>&1 && exit 1 || true
+          grep '"version"' claude-status-extension-firefox-v3/manifest.json
+          grep '"version"' claude-status-extension-chrome-v3/manifest.json
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
