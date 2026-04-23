@@ -12,6 +12,7 @@ const BROWSER_GLOBALS = {
   URL: 'readonly',
   self: 'readonly',
   navigator: 'readonly',
+  history: 'readonly',
   chrome: 'readonly',
   browser: 'readonly',
   importScripts: 'readonly',

@@ -64,6 +64,9 @@ npm test             # vitest (tests/shared.test.js)
 npm run test:watch   # watch mode
 ```
 
+#### ESLint — Browser Globals
+The ESLint config (`eslint.config.js`) uses a manual `BROWSER_GLOBALS` allowlist instead of the built-in `browser` environment. **Whenever new browser APIs are used in `src/` (e.g. `history`, `IntersectionObserver`, `crypto`), they must be added to `BROWSER_GLOBALS` — otherwise CI fails with `no-undef` errors.** Current list: `window`, `document`, `console`, `setTimeout`, `clearTimeout`, `setInterval`, `clearInterval`, `fetch`, `AbortController`, `MutationObserver`, `URL`, `self`, `navigator`, `history`, `chrome`, `browser`, `importScripts`.
+
 ### Manual Testing
 Key scenarios:
 - Widget appears bottom-right on claude.ai
