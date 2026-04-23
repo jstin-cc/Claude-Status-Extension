@@ -5,7 +5,7 @@ A Firefox and Chrome extension that displays the real-time operational status of
 ![Firefox](https://img.shields.io/badge/Firefox-140%2B-orange?logo=firefox)
 ![Chrome](https://img.shields.io/badge/Chrome-MV3-blue?logo=googlechrome)
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue)
-![Version](https://img.shields.io/badge/Version-3.1-brightgreen)
+![Version](https://img.shields.io/badge/Version-3.2-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 ---
@@ -13,7 +13,7 @@ A Firefox and Chrome extension that displays the real-time operational status of
 ## Features
 
 ### Widget (claude.ai)
-- **Live status widget** — appears in the bottom-right corner of claude.ai
+- **Live status widget** — appears in the bottom-right corner of claude.ai; repositions automatically to the top-right on Design pages (`claude.ai/design/…`) so it doesn't overlap the canvas
 - **Color-coded indicator** — green (operational), yellow (degraded), orange (partial outage), red (major outage), gray (maintenance)
 - **Expandable component list** — shows the status of each individual Anthropic service
 - **Auto-refresh** — polls the official Anthropic status API at a configurable interval
@@ -32,6 +32,12 @@ A Firefox and Chrome extension that displays the real-time operational status of
 - **Bilingual** — German 🇩🇪 and English 🇺🇸, switchable in widget and popup
 - **Configurable poll interval** — 30s, 1 min, 2 min, or 5 min
 - **Persistent settings** — all preferences saved locally via `browser.storage.local`
+
+---
+
+## What's New in v3.2
+
+- **Design-area repositioning** — on `claude.ai/design/…` the widget moves from the bottom-right corner to the top-right toolbar area (`top: 5px; right: 170px`) so it no longer overlaps the canvas or navigation elements. The widget returns to its normal position when navigating back to any other page (SPA-navigation aware via `pushState` / `popstate`).
 
 ---
 
@@ -91,7 +97,7 @@ Install from [addons.mozilla.org](https://addons.mozilla.org) or sideload the `.
 1. Clone or download this repository
 2. Open Firefox → `about:debugging` → **"This Firefox"** → **"Load Temporary Add-on…"**
 3. Select `claude-status-extension-firefox-v3/manifest.json`
-4. Open [claude.ai](https://claude.ai) — the widget appears in the bottom-right corner
+4. Open [claude.ai](https://claude.ai) — the widget appears in the bottom-right corner (top-right on Design pages)
 
 ### Chrome — Manual (Developer)
 1. Open Chrome → `chrome://extensions` → enable **Developer mode**

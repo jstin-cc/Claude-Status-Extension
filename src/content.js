@@ -103,6 +103,19 @@
   widget.append(header, body);
   document.body.appendChild(widget);
 
+  function isDesignPage() {
+    return window.location.pathname.startsWith('/design');
+  }
+  function applyPageMode() {
+    widget.classList.toggle('csm-design-mode', isDesignPage());
+  }
+  applyPageMode();
+
+  const _push = history.pushState.bind(history);
+  history.pushState = function (...args) { _push(...args); applyPageMode(); };
+  const _replace = history.replaceState.bind(history);
+  history.replaceState = function (...args) { _replace(...args); applyPageMode(); };
+
   // ── Lang dropdown — appended to body, positioned via JS ────
 
   const langMenu = mk('div', 'csm-lang-menu');
@@ -178,6 +191,7 @@
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeLangMenu(); }, { signal: globalAC.signal });
   window.addEventListener('scroll', closeLangMenu, { capture: true, signal: globalAC.signal });
   window.addEventListener('resize', closeLangMenu, { signal: globalAC.signal });
+  window.addEventListener('popstate', applyPageMode, { signal: globalAC.signal });
 
   // Cleanup when widget is removed from DOM
   new MutationObserver((_, obs) => {

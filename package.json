@@ -1,6 +1,6 @@
 {
   "name": "claude-status-monitor",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "description": "Browser extension that displays Anthropic's real-time service status on claude.ai",
   "private": true,
   "type": "module",
