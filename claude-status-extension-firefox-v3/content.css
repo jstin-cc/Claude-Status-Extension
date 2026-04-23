@@ -353,3 +353,10 @@
     max-width: 280px;
   }
 }
+
+/* Design-Bereich (claude.ai/design/...) */
+#claude-status-widget.csm-design-mode {
+  bottom: auto;
+  top: 5px;
+  right: 170px;
+}
