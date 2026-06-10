@@ -1,44 +1,43 @@
-/* ── Theme variables ──────────────────────────────────────── */
+/* ── Theme tokens ─────────────────────────────────────────────
+   Warm anthracite / warm paper + coral accent so the widget reads as a
+   native claude.ai element. Status colors are slightly desaturated to sit
+   in the same temperature; light values are darkened for WCAG AA. */
 
 #claude-status-widget {
-  /* Dark (glassmorphism) */
-  --bg: rgba(18, 18, 18, 0.72);
-  --header-bg: rgba(40, 40, 38, 0.85);
-  --header-hover: rgba(55, 55, 52, 0.9);
-  --surface: rgba(255, 255, 255, 0.06);
-  --border: rgba(255, 255, 255, 0.13);
-  --text-primary: #f0f0f0;
-  --text-secondary: #9a9a9a;
-  --link: #60a5fa;
-  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --green: #22c55e;
-  --yellow: #eab308;
-  --orange: #f97316;
-  --red: #ef4444;
-  --gray: #6b7280;
+  --csm-bg: rgba(38, 38, 36, 0.96);          /* #262624 */
+  --csm-header-bg: rgba(48, 48, 45, 0.92);
+  --csm-header-hover: rgba(61, 61, 57, 0.95);
+  --csm-surface: rgba(255, 255, 255, 0.045);
+  --csm-border: rgba(255, 255, 255, 0.08);   /* hairline */
+  --csm-text: #faf9f5;
+  --csm-text-dim: #b8b5a9;
+  --csm-accent: #d97757;                     /* coral */
+  --csm-green: #4ca154;
+  --csm-yellow: #d4a72c;
+  --csm-orange: #e07a4f;
+  --csm-red: #e05252;
+  --csm-gray: #8a877d;
 }
 
 #claude-status-widget[data-theme="light"] {
-  /* Light (glassmorphism) — WCAG AA contrast ratios */
-  --bg: rgba(255, 255, 255, 0.78);
-  --header-bg: rgba(240, 240, 238, 0.92);
-  --header-hover: rgba(225, 225, 222, 0.95);
-  --surface: rgba(0, 0, 0, 0.06);
-  --border: rgba(0, 0, 0, 0.15);
-  --text-primary: #0a0a0a;
-  --text-secondary: #3d3d3d;
-  --link: #1d4ed8;
-  --green: #15803d;
-  --orange: #c2410c;
-  --yellow: #a16207;
-  --red: #b91c1c;
-  --gray: #374151;
+  --csm-bg: rgba(250, 249, 245, 0.97);       /* #faf9f5 warm paper */
+  --csm-header-bg: rgba(240, 238, 231, 0.95);
+  --csm-header-hover: rgba(231, 229, 220, 0.97);
+  --csm-surface: rgba(0, 0, 0, 0.04);
+  --csm-border: rgba(0, 0, 0, 0.08);
+  --csm-text: #1f1e1c;
+  --csm-text-dim: #6e6c64;
+  --csm-accent: #a84b2f;                     /* darker coral, AA on paper */
+  --csm-green: #1f7a33;
+  --csm-yellow: #946300;
+  --csm-orange: #b4501e;
+  --csm-red: #b91c1c;
+  --csm-gray: #6b6960;
 }
 
 /* Smooth theme transition */
 #claude-status-widget,
-#claude-status-widget *,
-#csm-lang-menu {
+#claude-status-widget * {
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
 }
 
@@ -51,28 +50,34 @@
   z-index: 2147483647;
   min-width: 0;
   max-width: 320px;
-  background: var(--bg);
-  backdrop-filter: blur(14px) saturate(180%);
-  -webkit-backdrop-filter: blur(14px) saturate(180%);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.35),
-    0 1px 0 rgba(255, 255, 255, 0.07) inset;
-  font-family: var(--font);
+  background: var(--csm-bg);
+  backdrop-filter: blur(10px) saturate(140%);
+  -webkit-backdrop-filter: blur(10px) saturate(140%);
+  border: 1px solid var(--csm-border);
+  border-radius: 14px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.3);
+  /* Inherit claude.ai's own font stack from <body> — that's the native look */
+  font-family: inherit;
   font-size: 13px;
-  color: var(--text-primary);
+  line-height: 1.4;
+  color: var(--csm-text);
   user-select: none;
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-/* Light mode: lighter shadow */
 #claude-status-widget[data-theme="light"] {
-  box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.14),
-    0 1px 0 rgba(255, 255, 255, 0.8) inset;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+#claude-status-widget[hidden] { display: none; }
+
+/* ── Icons ──────────────────────────────────────────────────── */
+
+.csm-icon {
+  display: block;
+  flex-shrink: 0;
 }
 
 /* ── Header ─────────────────────────────────── */
@@ -82,33 +87,47 @@
   gap: 7px;
   padding: 7px 12px;
   cursor: pointer;
-  background: var(--header-bg);
+  background: var(--csm-header-bg);
   white-space: nowrap;
-  border-radius: 20px; /* Pill when collapsed */
+  border-radius: 14px; /* Pill when collapsed */
   transition: background 0.2s ease, border-radius 0.22s ease;
 }
 
 #csm-header:hover {
-  background: var(--header-hover);
+  background: var(--csm-header-hover);
+}
+
+#csm-header:focus-visible {
+  outline: 2px solid var(--csm-accent);
+  outline-offset: -2px;
 }
 
 #claude-status-widget.expanded #csm-header {
   display: flex;
   width: 100%;
   box-sizing: border-box;
-  border-radius: 20px 20px 0 0; /* Flat bottom when expanded */
+  border-radius: 14px 14px 0 0; /* Flat bottom when expanded */
 }
 
 #csm-title {
   font-weight: 600;
   font-size: 12px;
-  color: var(--text-primary);
+  color: var(--csm-text);
 }
 
 #csm-chevron {
-  color: var(--text-secondary);
-  font-size: 10px;
-  line-height: 1;
+  color: var(--csm-text-dim);
+  display: flex;
+  align-items: center;
+}
+
+#csm-chevron .csm-icon {
+  transition: transform 0.22s ease;
+  transform: rotate(180deg); /* collapsed: point up */
+}
+
+#claude-status-widget.expanded #csm-chevron .csm-icon {
+  transform: rotate(0deg);
 }
 
 /* ── Header controls (lang + theme) shown only when expanded ── */
@@ -123,37 +142,39 @@
   display: flex;
 }
 
-#csm-lang-selector {
-  display: flex;
-  align-items: center;
-}
-
 #csm-lang-btn,
 #csm-theme-btn {
   background: none;
   border: none;
-  color: var(--text-secondary);
+  color: var(--csm-text-dim);
   cursor: pointer;
-  font-size: 13px;
-  padding: 6px 8px;
-  min-width: 32px;
-  min-height: 32px;
-  border-radius: 6px;
+  padding: 6px;
+  min-width: 30px;
+  min-height: 30px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 3px;
   line-height: 1;
+  font-family: inherit;
+}
+
+#csm-lang-btn {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
 }
 
 #csm-lang-btn:hover,
 #csm-theme-btn:hover {
-  background: rgba(128, 128, 128, 0.15);
+  background: var(--csm-surface);
+  color: var(--csm-text);
 }
 
-#csm-lang-arrow {
-  font-size: 9px;
-  color: var(--text-secondary);
+#csm-lang-btn:focus-visible,
+#csm-theme-btn:focus-visible {
+  outline: 2px solid var(--csm-accent);
+  outline-offset: -2px;
 }
 
 /* ── Body (CSS grid animation instead of max-height hack) ── */
@@ -167,7 +188,7 @@
 
 #claude-status-widget.expanded #csm-body {
   grid-template-rows: 1fr;
-  min-width: 220px;
+  min-width: 230px;
   width: auto;
 }
 
@@ -179,6 +200,43 @@
 #claude-status-widget.expanded #csm-body-inner {
   padding: 8px 0 4px;
 }
+
+/* ── Incident banner ─────────────────────────── */
+#csm-incident {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 8px 6px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--csm-surface);
+  border-left: 3px solid var(--csm-orange);
+}
+
+#csm-incident[hidden] { display: none; }
+
+#csm-incident.csm-incident-major { border-left-color: var(--csm-red); }
+#csm-incident.csm-incident-minor { border-left-color: var(--csm-orange); }
+#csm-incident.csm-incident-maintenance { border-left-color: var(--csm-gray); }
+
+.csm-incident-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--csm-text);
+  line-height: 1.35;
+}
+
+.csm-impact {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--csm-surface);
+  color: var(--csm-text-dim);
+  white-space: nowrap;
+}
+
+.csm-impact-major { color: var(--csm-red); }
+.csm-impact-minor { color: var(--csm-orange); }
 
 /* ── Components list ─────────────────────────── */
 #csm-components {
@@ -192,16 +250,16 @@
   align-items: center;
   gap: 8px;
   padding: 5px 8px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .csm-component:hover {
-  background: var(--surface);
+  background: var(--csm-surface);
 }
 
 .csm-component-name {
   flex: 1;
-  color: var(--text-primary);
+  color: var(--csm-text);
   font-size: 12px;
   white-space: nowrap;
   overflow: hidden;
@@ -210,60 +268,15 @@
 
 .csm-component-status {
   font-size: 11px;
-  color: var(--text-secondary);
+  color: var(--csm-text-dim);
   white-space: nowrap;
 }
 
 .csm-empty {
   padding: 8px 12px;
-  color: var(--text-secondary);
+  color: var(--csm-text-dim);
   font-size: 12px;
 }
-
-/* ── Incident banner ─────────────────────────── */
-#csm-incident {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin: 0 8px 6px;
-  padding: 6px 8px;
-  border-radius: 6px;
-  background: var(--surface);
-  border-left: 3px solid var(--orange);
-}
-
-#csm-incident[hidden] { display: none; }
-
-#csm-incident.csm-incident-major { border-left-color: var(--red); }
-#csm-incident.csm-incident-minor { border-left-color: var(--orange); }
-#csm-incident.csm-incident-maintenance { border-left-color: var(--gray); }
-
-.csm-incident-name {
-  flex: 1;
-  font-size: 12px;
-  color: var(--text-primary);
-  line-height: 1.35;
-}
-
-.csm-impact {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 10px;
-  background: var(--surface);
-  color: var(--text-secondary);
-  white-space: nowrap;
-}
-
-.csm-impact-major { color: var(--red); }
-.csm-impact-minor { color: var(--orange); }
-
-/* ── Stale data indicator ────────────────────── */
-#csm-timestamp.csm-stale {
-  color: var(--yellow);
-}
-
-/* ── Visibility toggle (display:flex beats [hidden]) ── */
-#claude-status-widget[hidden] { display: none; }
 
 /* ── Skeleton loading animation ──────────────── */
 @keyframes csm-shimmer {
@@ -276,33 +289,43 @@
   animation: csm-shimmer 1.5s ease-in-out infinite;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .csm-loading { animation: none; }
-}
-
 /* ── Footer ─────────────────────────────────── */
 #csm-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
   padding: 6px 12px 4px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--csm-border);
   margin-top: 4px;
 }
 
 #csm-timestamp {
   font-size: 11px;
-  color: var(--text-secondary);
+  color: var(--csm-text-dim);
+}
+
+#csm-timestamp.csm-stale {
+  color: var(--csm-yellow);
 }
 
 #csm-link {
   font-size: 11px;
-  color: var(--link);
+  color: var(--csm-accent);
   text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
 }
 
 #csm-link:hover {
   text-decoration: underline;
+}
+
+#csm-link:focus-visible {
+  outline: 2px solid var(--csm-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* ── Status dots ─────────────────────────────── */
@@ -314,11 +337,11 @@
   flex-shrink: 0;
 }
 
-.csm-green  { background: var(--green);  box-shadow: 0 0 6px var(--green); }
-.csm-yellow { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
-.csm-orange { background: var(--orange); box-shadow: 0 0 6px var(--orange); }
-.csm-red    { background: var(--red);    box-shadow: 0 0 6px var(--red); }
-.csm-gray   { background: var(--gray); }
+.csm-green  { background: var(--csm-green);  box-shadow: 0 0 4px var(--csm-green); }
+.csm-yellow { background: var(--csm-yellow); box-shadow: 0 0 4px var(--csm-yellow); }
+.csm-orange { background: var(--csm-orange); box-shadow: 0 0 4px var(--csm-orange); }
+.csm-red    { background: var(--csm-red);    box-shadow: 0 0 4px var(--csm-red); }
+.csm-gray   { background: var(--csm-gray); }
 
 /* ── Pulse animation (incidents) ─────────────── */
 @keyframes csm-pulse {
@@ -331,10 +354,10 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .csm-loading { animation: none; }
   .csm-dot.csm-pulsing { animation: none; }
   #claude-status-widget,
-  #claude-status-widget *,
-  #csm-lang-menu { transition: none !important; }
+  #claude-status-widget * { transition: none !important; }
 }
 
 /* ── Scrollbar ───────────────────────────────── */
@@ -343,45 +366,6 @@
 #csm-components::-webkit-scrollbar-thumb {
   background: rgba(128, 128, 128, 0.3);
   border-radius: 2px;
-}
-
-/* ── Lang dropdown ───────────────────────────── */
-#csm-lang-menu {
-  position: fixed;
-  background: rgba(28, 28, 28, 0.82);
-  backdrop-filter: blur(12px) saturate(160%);
-  -webkit-backdrop-filter: blur(12px) saturate(160%);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  overflow: hidden;
-  min-width: 120px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  z-index: 2147483647;
-  display: none;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-#csm-lang-menu.open {
-  display: block;
-}
-
-.csm-lang-option {
-  padding: 7px 11px;
-  cursor: pointer;
-  font-size: 12px;
-  color: var(--text-primary, #f5f5f5);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  user-select: none;
-}
-
-.csm-lang-option:hover {
-  background: rgba(128, 128, 128, 0.1);
-}
-
-.csm-lang-option.active {
-  color: var(--link, #60a5fa);
 }
 
 /* ── Responsive ───────────────────────────────── */
@@ -399,7 +383,7 @@
   }
 }
 
-/* Design-Bereich (claude.ai/design/...) */
+/* Design area (claude.ai/design/...) */
 #claude-status-widget.csm-design-mode {
   bottom: auto;
   top: 5px;
