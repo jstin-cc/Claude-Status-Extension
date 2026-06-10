@@ -1,6 +1,48 @@
 # Claude Status Monitor — Änderungsprotokoll
 
-**Stand: 2026-04-10 — v3.1 veröffentlicht.**
+**Stand: 2026-06-10 — v4.0 veröffentlicht.**
+
+---
+
+## v4.0 (2026-06-10)
+
+Große Überarbeitung: kritische Bugfixes, MV3-feste Architektur, natives claude.ai-Design.
+
+### Kritische Bugfixes
+- **Benachrichtigungen funktionieren jetzt wirklich**: Der gesamte Background-State (`lastStatus`, Fehlerzähler, Cache) lag bisher nur im RAM des Service Workers, den Chrome nach ~30s Idle beendet — die Vergleichsbasis ging vor jedem Poll verloren, Notifications feuerten praktisch nie. Jetzt liegt der State in `chrome.storage.session` und wird bei jedem Worker-Start lazy hydriert (gilt auch für Firefox-Event-Pages).
+- **`degraded_performance` war für den Notifier unsichtbar**: Die alten Rank-Maps verglichen Farben und kannten `yellow` nicht — eine Verschlechterung auf „Eingeschränkt" wurde nie gemeldet, und beim Auflösen eines Incidents bei weiterhin degradierter Komponente kam eine falsche „Alles wieder operational"-Meldung. Vergleiche laufen jetzt über Status-Strings (`isWorseStatus`/`isRecoveryStatus`, mit Regressionstests).
+- **SPA-Navigation wird jetzt erkannt**: Der `history.pushState`-Patch konnte Navigationen der claude.ai-App aus der Isolated World prinzipiell nie sehen — die `/design`-Repositionierung griff nur bei Initial-Load. Jetzt: `popstate` + Navigation API (Chrome) + leichtgewichtiger Location-Watcher (Firefox).
+- **Timestamps lügen nicht mehr**: Widget und Popup zeigen den echten Abrufzeitpunkt (`fetchedAt` im Payload) inkl. relativem Alter; ab 5 Minuten wird der Timestamp amber eingefärbt. Bisher wurde die Renderzeit gedruckt — auch für minutenalte Cache-Daten.
+- **Uptime-Chart**: Degradierte Tage werden jetzt gelb dargestellt (vorher stillschweigend grün, `yellow` fehlte in `COLOR_PRIORITY`/Labels); `critical`-Impact mappt auf rot.
+
+### Architektur
+- **Payload-Vertrag**: `buildStatusPayload()` definiert die eine Datenform (`components`, `incidents`, `scheduled_maintenances`, `indicator`, `fetchedAt`) für Broadcast, `GET_STATUS` und `GET_SUMMARY`.
+- **Statuspage-Indicator**: Der Gesamtstatus berücksichtigt jetzt `status.indicator` aus summary.json (Statuspages eigene Bewertung inkl. Incidents) zusätzlich zur schlechtesten Komponente.
+- **Single-Flight-Fetches**: Alarm-Tick, `GET_STATUS`-Kaltpfad und `FORCE_FETCH` teilen einen In-Flight-Request; der Kaltpfad nutzt denselben Erfolgs-Pfad (Persist + Badge + Notify + Backoff-Reset).
+- **Split-Polling**: Der 60s-Poll lädt nur noch `summary.json`; die komplette `incidents.json`-Historie wird erst beim Öffnen des Popups geholt (2-Min-TTL) — deutlich weniger Traffic.
+- **API-Validierung** auch für die Incidents-Shape; alter Cache wird bei Update-Installation verworfen.
+
+### Design (natives claude.ai-Look-and-feel)
+- **Warmes Token-System**: Anthrazit `#262624` (dark) / warmes Papier `#faf9f5` (light), Coral-Akzent `#d97757` statt blauer Links, Hairline-Borders, 12–14px-Radien, dezenteres Blur; Widget erbt claude.ai's eigene Schrift (`font-family: inherit`).
+- **Auto-Theme (neuer Default)**: `auto` folgt dem tatsächlichen claude.ai-Theme (Klassen-/Attribut-Erkennung mit Luminanz-Fallback, live per MutationObserver); explizite Dark/Light-Wahl gewinnt weiterhin. Das Popup folgt bei `auto` der OS-Einstellung.
+- **SVG-Icons statt Emojis** (`createElementNS`, AMO-konform, `currentColor`); **DE/EN-Text-Toggle statt Flaggen-Dropdown** — entfernt das Body-Menü samt JS-Positionierung und Inline-Style-Theming (~90 Zeilen).
+- Focus-visible-Styles auf allen interaktiven Elementen.
+
+### Neue Features
+- **Incident-Banner im Widget**: Aktive Vorfälle erscheinen mit Impact-Badge direkt im aufgeklappten Widget.
+- **Stale-Anzeige**: „Stand: 14:32 Uhr · vor 5 Min." mit Amber-Tint bei veralteten Daten.
+- **Widget-Sichtbarkeit**: Neues Setting im Popup blendet das On-Page-Widget live aus/ein.
+- **Sprach-Default nach Browser-Locale** statt erzwungenem Deutsch (gespeicherte Wahl bleibt unangetastet); alle aria-Labels werden mitübersetzt.
+
+### Qualität
+- Tests 27 → 63 (u. a. Notification-Regressionsfälle, `classifyFetchError`-Tabelle, `formatLastChecked`-Grenzen, rekursive DE/EN-Label-Parität).
+- `UI_LABELS` als einzige Quelle aller UI-Strings; DOM-Helfer auf `csmEl` konsolidiert; Listener-/Timer-Teardown vollständig.
+- Repo-URLs vereinheitlicht (`package.json`, `homepage_url`); CLAUDE.md an die reale Architektur angepasst.
+
+### Verhaltensänderungen
+- Theme-Default ist `auto` (folgt claude.ai); bestehende explizite Dark/Light-Einstellungen bleiben erhalten.
+- Sprach-Default folgt der Browser-Sprache; bestehende Einstellungen bleiben erhalten.
+- 30s-Intervall: Chrome < 120 und ggf. Firefox runden auf 1 Min auf (Browser-Limit für `chrome.alarms`).
 
 ---
 
