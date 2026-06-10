@@ -220,6 +220,51 @@
   font-size: 12px;
 }
 
+/* ── Incident banner ─────────────────────────── */
+#csm-incident {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 8px 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--surface);
+  border-left: 3px solid var(--orange);
+}
+
+#csm-incident[hidden] { display: none; }
+
+#csm-incident.csm-incident-major { border-left-color: var(--red); }
+#csm-incident.csm-incident-minor { border-left-color: var(--orange); }
+#csm-incident.csm-incident-maintenance { border-left-color: var(--gray); }
+
+.csm-incident-name {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-primary);
+  line-height: 1.35;
+}
+
+.csm-impact {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.csm-impact-major { color: var(--red); }
+.csm-impact-minor { color: var(--orange); }
+
+/* ── Stale data indicator ────────────────────── */
+#csm-timestamp.csm-stale {
+  color: var(--yellow);
+}
+
+/* ── Visibility toggle (display:flex beats [hidden]) ── */
+#claude-status-widget[hidden] { display: none; }
+
 /* ── Skeleton loading animation ──────────────── */
 @keyframes csm-shimmer {
   0%   { opacity: 0.4; }

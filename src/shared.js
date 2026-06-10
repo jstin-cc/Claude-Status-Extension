@@ -195,7 +195,7 @@ function formatLastChecked(fetchedAt, lang, now) {
 
 const UI_LABELS = {
   de: {
-    impact: { major: 'Kritisch', minor: 'Gering', maintenance: 'Wartung', none: '' },
+    impact: { critical: 'Kritisch', major: 'Schwerwiegend', minor: 'Gering', maintenance: 'Wartung', none: '' },
     widget: {
       loading: 'Wird geladen…',
       error: 'Status nicht verfügbar',
@@ -266,7 +266,7 @@ const UI_LABELS = {
     },
   },
   en: {
-    impact: { major: 'Major', minor: 'Minor', maintenance: 'Maintenance', none: '' },
+    impact: { critical: 'Critical', major: 'Major', minor: 'Minor', maintenance: 'Maintenance', none: '' },
     widget: {
       loading: 'Loading…',
       error: 'Status unavailable',
