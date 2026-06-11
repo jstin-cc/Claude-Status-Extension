@@ -1,115 +1,34 @@
 'use strict';
 
-// STATUS_COLOR, STATUS_PRIORITY, getOverallColor, SHARED_STATUS_LABELS,
-// ERROR_CODES, ERROR_LABELS, CSM_CONFIG, STORAGE_KEYS, csmEl — from shared.js
+// STATUS_COLOR, STATUS_PRIORITY, getOverallStatus, SHARED_STATUS_LABELS,
+// ERROR_CODES, ERROR_LABELS, UI_LABELS, CSM_CONFIG, STORAGE_KEYS,
+// formatLastChecked, csmEl, csmIcon — from shared.js
 
-const LABELS = {
-  de: {
-    components: 'Komponenten',
-    activeIncidents: 'Aktive Vorfälle',
-    scheduledMaint: 'Geplante Wartung',
-    recentIncidents: 'Letzte Vorfälle',
-    noIncidents: 'Keine aktuellen Vorfälle',
-    noMaintenance: 'Keine geplanten Wartungen',
-    noHistory: 'Keine aufgelösten Vorfälle in den letzten 7 Tagen',
-    uptimeHistory: '7-Tage-Verlauf',
-    dayNames: ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'],
-    today: 'Heute',
-    loading: 'Wird geladen…',
-    error: 'Daten nicht verfügbar',
-    lastChecked: (t) => `Zuletzt geprüft: ${t} Uhr`,
-    impact: { major: 'Kritisch', minor: 'Gering', maintenance: 'Wartung', none: '' },
-    incidentStatus: {
-      investigating: 'Wird untersucht',
-      identified: 'Identifiziert',
-      monitoring: 'Monitoring',
-      resolved: 'Behoben',
-      postmortem: 'Postmortem',
-    },
-    maintStatus: {
-      scheduled: 'Geplant',
-      in_progress: 'Läuft',
-      completed: 'Abgeschlossen',
-    },
-    compStatus: SHARED_STATUS_LABELS.de,
-    duration: (mins) => {
-      if (mins < 60) return `${mins} Min.`;
-      const h = Math.floor(mins / 60);
-      const m = mins % 60;
-      return m > 0 ? `${h} Std. ${m} Min.` : `${h} Std.`;
-    },
-    ago: (mins) => {
-      if (mins < 2) return 'gerade eben';
-      if (mins < 60) return `vor ${mins} Min.`;
-      const h = Math.floor(mins / 60);
-      return `vor ${h} Std.`;
-    },
-  },
-  en: {
-    components: 'Components',
-    activeIncidents: 'Active Incidents',
-    scheduledMaint: 'Scheduled Maintenance',
-    recentIncidents: 'Recent Incidents',
-    noIncidents: 'No active incidents',
-    noMaintenance: 'No scheduled maintenance',
-    noHistory: 'No resolved incidents in the last 7 days',
-    uptimeHistory: '7-Day History',
-    dayNames: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-    today: 'Today',
-    loading: 'Loading…',
-    error: 'Data unavailable',
-    lastChecked: (t) => `Last checked: ${t}`,
-    impact: { major: 'Major', minor: 'Minor', maintenance: 'Maintenance', none: '' },
-    incidentStatus: {
-      investigating: 'Investigating',
-      identified: 'Identified',
-      monitoring: 'Monitoring',
-      resolved: 'Resolved',
-      postmortem: 'Postmortem',
-    },
-    maintStatus: {
-      scheduled: 'Scheduled',
-      in_progress: 'In Progress',
-      completed: 'Completed',
-    },
-    compStatus: SHARED_STATUS_LABELS.en,
-    duration: (mins) => {
-      if (mins < 60) return `${mins}m`;
-      const h = Math.floor(mins / 60);
-      const m = mins % 60;
-      return m > 0 ? `${h}h ${m}m` : `${h}h`;
-    },
-    ago: (mins) => {
-      if (mins < 2) return 'just now';
-      if (mins < 60) return `${mins}m ago`;
-      const h = Math.floor(mins / 60);
-      return `${h}h ago`;
-    },
-  },
-};
+function P() {
+  return UI_LABELS[currentLang].popup;
+}
 
-let currentLang  = 'de';
-let currentTheme = (window.matchMedia?.('(prefers-color-scheme: light)')?.matches) ? 'light' : 'dark';
+let currentLang = (navigator.language || 'en').toLowerCase().startsWith('de') ? 'de' : 'en';
+let themeSetting = 'auto'; // 'auto' | 'dark' | 'light'
 let cachedResponse = null;
 
-function applyTheme(theme) {
-  currentTheme = theme;
-  document.documentElement.dataset.theme = theme;
-  const icon = theme === 'dark' ? '🌙' : '☀️';
-  const themeBtn = document.getElementById('p-theme-btn');
-  if (themeBtn) themeBtn.textContent = icon;
-  const settingBtn = document.getElementById('p-setting-theme-btn');
-  if (settingBtn) settingBtn.textContent = icon;
+// The popup cannot see claude.ai, so 'auto' falls back to the OS preference
+// (the widget itself follows claude.ai's theme — documented asymmetry).
+function resolvePopupTheme(setting) {
+  if (setting === 'dark' || setting === 'light') return setting;
+  return window.matchMedia?.('(prefers-color-scheme: light)')?.matches ? 'light' : 'dark';
+}
+
+function applyTheme(setting) {
+  themeSetting = setting;
+  const resolved = resolvePopupTheme(setting);
+  document.documentElement.dataset.theme = resolved;
+  document.getElementById('p-theme-btn')
+    .replaceChildren(csmIcon(resolved === 'dark' ? 'moon' : 'sun', 14));
+  document.getElementById('p-setting-theme').value = setting;
 }
 
 // ── Helpers ──────────────────────────────────────────────────
-
-function el(tag, className, text) {
-  const e = document.createElement(tag);
-  if (className) e.className = className;
-  if (text !== undefined) e.textContent = text;
-  return e;
-}
 
 function minutesAgo(dateStr) {
   return Math.max(0, Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000));
@@ -128,20 +47,19 @@ function formatTimeRange(fromStr, toStr) {
   return `${new Date(fromStr).toLocaleTimeString(locale, opts)} – ${new Date(toStr).toLocaleTimeString(locale, opts)} UTC`;
 }
 
-// getOverallColor — from shared.js
-
 // ── Render functions ─────────────────────────────────────────
 
 function renderUptimeChart(allIncidents, summaryData) {
-  const L = LABELS[currentLang];
+  const L = P();
   const container = document.getElementById('p-uptime-bars');
   container.replaceChildren();
+  container.setAttribute('aria-label', L.uptimeAria);
 
-  const COLOR_PRIORITY = { red: 3, orange: 2, gray: 1, green: 0 };
+  const COLOR_PRIORITY = { red: 4, orange: 3, yellow: 2, gray: 1, green: 0 };
 
   // Map incident impact → color
   function impactColor(impact) {
-    if (impact === 'major') return 'red';
+    if (impact === 'critical' || impact === 'major') return 'red';
     if (impact === 'minor') return 'orange';
     return 'gray'; // maintenance / none
   }
@@ -167,7 +85,7 @@ function renderUptimeChart(allIncidents, summaryData) {
 
     // For today also factor in live component status
     if (daysAgo === 0) {
-      const compColor = getOverallColor(summaryData.components ?? []);
+      const compColor = STATUS_COLOR[getOverallStatus(summaryData.components ?? [], summaryData.indicator)] ?? 'gray';
       if ((COLOR_PRIORITY[compColor] ?? 0) > (COLOR_PRIORITY[color] ?? 0)) color = compColor;
     }
 
@@ -176,18 +94,20 @@ function renderUptimeChart(allIncidents, summaryData) {
       currentLang === 'de' ? 'de-DE' : 'en-US',
       { day: '2-digit', month: '2-digit', timeZone: 'UTC' }
     );
+    const S = SHARED_STATUS_LABELS[currentLang];
     const statusLabel = {
-      green:  L.compStatus.operational,
-      orange: L.compStatus.partial_outage,
-      red:    L.compStatus.major_outage,
-      gray:   L.compStatus.under_maintenance,
-    }[color];
+      green:  S.operational,
+      yellow: S.degraded_performance,
+      orange: S.partial_outage,
+      red:    S.major_outage,
+      gray:   S.under_maintenance,
+    }[color] ?? color;
 
-    const wrapper = el('div', 'p-uptime-bar-wrapper');
-    const bar     = el('div', `p-uptime-bar p-uptime-${color}`);
+    const wrapper = csmEl('div', 'p-uptime-bar-wrapper');
+    const bar     = csmEl('div', `p-uptime-bar p-uptime-${color}`);
     bar.title = `${dateLabel}: ${statusLabel}`;
 
-    const label = el('span', 'p-uptime-label');
+    const label = csmEl('span', 'p-uptime-label');
     if (daysAgo === 0) {
       label.textContent = L.today;
       label.classList.add('p-uptime-today');
@@ -198,28 +118,25 @@ function renderUptimeChart(allIncidents, summaryData) {
     wrapper.append(bar, label);
     container.appendChild(wrapper);
   }
-
-  document.getElementById('p-uptime-title').textContent = L.uptimeHistory;
 }
 
 function renderComponents(components) {
-  const L = LABELS[currentLang];
   const container = document.getElementById('p-components');
   container.replaceChildren();
   const visible = components.filter((c) => !c.group);
   for (const c of visible) {
-    const row = el('div', 'p-component-row');
+    const row = csmEl('div', 'p-component-row');
     row.append(
-      el('span', `p-dot p-${STATUS_COLOR[c.status] ?? 'gray'}`),
-      el('span', 'p-comp-name', c.name),
-      el('span', 'p-comp-status', L.compStatus[c.status] ?? c.status)
+      csmEl('span', `p-dot p-${STATUS_COLOR[c.status] ?? 'gray'}`),
+      csmEl('span', 'p-comp-name', c.name),
+      csmEl('span', 'p-comp-status', SHARED_STATUS_LABELS[currentLang][c.status] ?? c.status)
     );
     container.appendChild(row);
   }
 }
 
 function renderActiveIncidents(incidents) {
-  const L = LABELS[currentLang];
+  const L = P();
   const container = document.getElementById('p-active-incidents');
   const countEl = document.getElementById('p-active-count');
   container.replaceChildren();
@@ -228,30 +145,31 @@ function renderActiveIncidents(incidents) {
   countEl.style.display = incidents.length ? 'inline' : 'none';
 
   if (!incidents.length) {
-    container.appendChild(el('div', 'p-empty', L.noIncidents));
+    container.appendChild(csmEl('div', 'p-empty', L.noIncidents));
     return;
   }
 
   for (const inc of incidents) {
-    const card = el('div', `p-incident-card p-incident-${inc.impact}`);
+    const impactClass = inc.impact === 'critical' ? 'major' : inc.impact;
+    const card = csmEl('div', `p-incident-card p-incident-${impactClass}`);
 
-    const header = el('div', 'p-incident-header');
-    const impactLabel = L.impact[inc.impact];
+    const header = csmEl('div', 'p-incident-header');
+    const impactLabel = UI_LABELS[currentLang].impact[inc.impact] ?? inc.impact;
     header.append(
-      el('span', 'p-incident-name', inc.name),
-      ...(impactLabel ? [el('span', `p-badge p-impact-${inc.impact}`, impactLabel)] : [])
+      csmEl('span', 'p-incident-name', inc.name),
+      ...(impactLabel ? [csmEl('span', `p-badge p-impact-${impactClass}`, impactLabel)] : [])
     );
 
-    const meta = el('div', 'p-incident-meta');
+    const meta = csmEl('div', 'p-incident-meta');
     meta.append(
-      el('span', 'p-incident-status', L.incidentStatus[inc.status] ?? inc.status),
-      el('span', 'p-incident-time', L.ago(minutesAgo(inc.started_at)))
+      csmEl('span', 'p-incident-status', L.incidentStatus[inc.status] ?? inc.status),
+      csmEl('span', 'p-incident-time', L.ago(minutesAgo(inc.started_at)))
     );
 
     card.append(header, meta);
 
     if (inc.incident_updates?.length) {
-      card.appendChild(el('div', 'p-incident-update', inc.incident_updates[0].body));
+      card.appendChild(csmEl('div', 'p-incident-update', inc.incident_updates[0].body));
     }
 
     container.appendChild(card);
@@ -259,7 +177,7 @@ function renderActiveIncidents(incidents) {
 }
 
 function renderScheduledMaintenance(maintenances) {
-  const L = LABELS[currentLang];
+  const L = P();
   const container = document.getElementById('p-maintenance');
   const countEl = document.getElementById('p-maint-count');
   container.replaceChildren();
@@ -269,23 +187,23 @@ function renderScheduledMaintenance(maintenances) {
   countEl.style.display = active.length ? 'inline' : 'none';
 
   if (!active.length) {
-    container.appendChild(el('div', 'p-empty', L.noMaintenance));
+    container.appendChild(csmEl('div', 'p-empty', L.noMaintenance));
     return;
   }
 
   for (const m of active) {
-    const card = el('div', 'p-maint-card');
+    const card = csmEl('div', 'p-maint-card');
 
-    const header = el('div', 'p-maint-header');
+    const header = csmEl('div', 'p-maint-header');
     header.append(
-      el('span', 'p-maint-name', m.name),
-      el('span', 'p-badge p-maint-status-badge', L.maintStatus[m.status] ?? m.status)
+      csmEl('span', 'p-maint-name', m.name),
+      csmEl('span', 'p-badge p-maint-status-badge', L.maintStatus[m.status] ?? m.status)
     );
 
     card.appendChild(header);
 
     if (m.scheduled_for && m.scheduled_until) {
-      const time = el('div', 'p-maint-time');
+      const time = csmEl('div', 'p-maint-time');
       time.textContent = `${formatDate(m.scheduled_for)} · ${formatTimeRange(m.scheduled_for, m.scheduled_until)}`;
       card.appendChild(time);
     }
@@ -295,7 +213,7 @@ function renderScheduledMaintenance(maintenances) {
 }
 
 function renderHistory(allIncidents) {
-  const L = LABELS[currentLang];
+  const L = P();
   const container = document.getElementById('p-history');
   container.replaceChildren();
 
@@ -305,88 +223,99 @@ function renderHistory(allIncidents) {
     .slice(0, 5);
 
   if (!recent.length) {
-    container.appendChild(el('div', 'p-empty', L.noHistory));
+    container.appendChild(csmEl('div', 'p-empty', L.noHistory));
     return;
   }
 
   for (const inc of recent) {
-    const row = el('div', 'p-history-row');
+    const row = csmEl('div', 'p-history-row');
 
     const durationMins = Math.round(
       (new Date(inc.resolved_at).getTime() - new Date(inc.started_at).getTime()) / 60000
     );
 
-    const meta = el('div', 'p-history-meta');
+    const meta = csmEl('div', 'p-history-meta');
     meta.append(
-      el('span', 'p-history-date', formatDate(inc.resolved_at)),
-      el('span', 'p-history-sep', '·'),
-      el('span', 'p-history-duration', L.duration(durationMins))
+      csmEl('span', 'p-history-date', formatDate(inc.resolved_at)),
+      csmEl('span', 'p-history-sep', '·'),
+      csmEl('span', 'p-history-duration', L.duration(durationMins))
     );
 
-    row.append(
-      el('span', 'p-history-check', '✓'),
-      el('span', 'p-history-name', inc.name),
-      meta
-    );
+    const check = csmEl('span', 'p-history-check');
+    check.appendChild(csmIcon('check', 11));
+
+    row.append(check, csmEl('span', 'p-history-name', inc.name), meta);
     container.appendChild(row);
   }
 }
 
-function renderAll(summaryData, incidentsData) {
-  const L = LABELS[currentLang];
+function renderAll(summaryData, allIncidents) {
   const components = summaryData.components ?? [];
   const activeIncidents = summaryData.incidents ?? [];
   const maintenances = summaryData.scheduled_maintenances ?? [];
-  const allIncidents = incidentsData?.incidents ?? [];
 
-  // Header dot: red/orange if active incident, otherwise worst component color
-  const overallColor = activeIncidents.length > 0
-    ? (activeIncidents.some((i) => i.impact === 'major') ? 'red' : 'orange')
-    : getOverallColor(components);
-  const pulse = overallColor === 'red' || overallColor === 'orange' || overallColor === 'yellow';
-  document.getElementById('p-dot').className = `p-dot p-${overallColor}${pulse ? ' p-pulsing' : ''}`;
+  // Header dot: worst of Statuspage indicator + components
+  const status = getOverallStatus(components, summaryData.indicator);
+  const overallColor = STATUS_COLOR[status] ?? 'gray';
+  const pulse = (STATUS_PRIORITY[status] ?? 0) >= STATUS_PRIORITY.degraded_performance;
+  const dotEl = document.getElementById('p-dot');
+  dotEl.className = `p-dot p-${overallColor}${pulse ? ' p-pulsing' : ''}`;
+  dotEl.setAttribute('aria-label', `Status: ${SHARED_STATUS_LABELS[currentLang][status] ?? status}`);
 
   renderComponents(components);
-  renderUptimeChart(allIncidents, summaryData);
+  renderUptimeChart(allIncidents ?? [], summaryData);
   renderActiveIncidents(activeIncidents);
   renderScheduledMaintenance(maintenances);
-  renderHistory(allIncidents);
+  renderHistory(allIncidents ?? []);
 
-  // Section titles (for language switching)
+  const { text, stale } = formatLastChecked(summaryData.fetchedAt ?? Date.now(), currentLang);
+  const ts = document.getElementById('p-timestamp');
+  ts.textContent = text;
+  ts.classList.toggle('p-stale', stale);
+}
+
+function updateLangUI() {
+  const L = P();
+  document.documentElement.lang = currentLang;
+  const langBtn = document.getElementById('p-lang-btn');
+  langBtn.textContent = currentLang.toUpperCase();
+  langBtn.setAttribute('aria-label', L.langAria);
+  langBtn.title = L.langAria;
+  const refreshBtn = document.getElementById('p-refresh-btn');
+  refreshBtn.setAttribute('aria-label', L.refreshAria);
+  refreshBtn.title = L.refreshAria;
+  const themeBtn = document.getElementById('p-theme-btn');
+  themeBtn.setAttribute('aria-label', L.themeAria);
+  themeBtn.title = L.themeAria;
+  const settingsBtn = document.getElementById('p-settings-btn');
+  settingsBtn.setAttribute('aria-label', L.settingsAria);
+  settingsBtn.title = L.settingsAria;
+  document.getElementById('p-settings-back').setAttribute('aria-label', L.backAria);
+
+  // Section titles live here (not in renderAll) so error states have them too
   document.getElementById('p-components-title').textContent = L.components;
+  document.getElementById('p-uptime-title').textContent = L.uptimeHistory;
   document.getElementById('p-active-title').textContent = L.activeIncidents;
   document.getElementById('p-maint-title').textContent = L.scheduledMaint;
   document.getElementById('p-history-title').textContent = L.recentIncidents;
 
-  const time = new Date().toLocaleTimeString(
-    currentLang === 'de' ? 'de-DE' : 'en-US',
-    { hour: '2-digit', minute: '2-digit' }
-  );
-  document.getElementById('p-timestamp').textContent = L.lastChecked(time);
-}
+  const link = document.getElementById('p-link');
+  link.replaceChildren(document.createTextNode('status.anthropic.com'), csmIcon('external', 10));
 
-function updateLangUI() {
-  document.getElementById('p-lang-flag').textContent = currentLang === 'de' ? '🇩🇪' : '🇺🇸';
-  document.querySelectorAll('.p-lang-option').forEach((o) =>
-    o.classList.toggle('active', o.dataset.lang === currentLang)
-  );
+  updateSettingsLabels();
 }
 
 function getPopupErrorLabel(code) {
-  return ERROR_LABELS[currentLang]?.[code] ?? ERROR_LABELS[currentLang]?.UNKNOWN ?? LABELS[currentLang].error;
+  return ERROR_LABELS[currentLang]?.[code] ?? ERROR_LABELS[currentLang]?.UNKNOWN ?? P().error;
 }
 
 function showPopupError(code) {
   const container = document.getElementById('p-components');
   container.replaceChildren();
-  const msg = el('div', 'p-empty', getPopupErrorLabel(code));
-  container.appendChild(msg);
+  container.appendChild(csmEl('div', 'p-empty', getPopupErrorLabel(code)));
 
-  const dot = document.getElementById('p-dot');
-  dot.className = 'p-dot p-gray';
-
-  const ts = document.getElementById('p-timestamp');
-  ts.textContent = `E:${code}`;
+  document.getElementById('p-dot').className = 'p-dot p-gray';
+  document.getElementById('p-timestamp').textContent = `E:${code}`;
 }
 
 function requestAndRender() {
@@ -400,25 +329,27 @@ function requestAndRender() {
       return;
     }
     cachedResponse = response;
-    renderAll(response.summary ?? {}, response.incidents ?? {});
+    renderAll(response.summary ?? {}, response.incidents ?? []);
   });
 }
 
 // ── Init ─────────────────────────────────────────────────────
 
+document.getElementById('p-refresh-btn').replaceChildren(csmIcon('refresh', 13));
+document.getElementById('p-settings-btn').replaceChildren(csmIcon('settings', 14));
+document.getElementById('p-settings-back').replaceChildren(csmIcon('back', 14));
+
 chrome.storage.local.get([STORAGE_KEYS.LANG, STORAGE_KEYS.THEME], (stored) => {
-  if (stored[STORAGE_KEYS.LANG])  currentLang = stored[STORAGE_KEYS.LANG];
-  if (stored[STORAGE_KEYS.THEME]) applyTheme(stored[STORAGE_KEYS.THEME]);
+  if (stored[STORAGE_KEYS.LANG]) currentLang = stored[STORAGE_KEYS.LANG];
+  applyTheme(stored[STORAGE_KEYS.THEME] ?? 'auto');
   updateLangUI();
   document.getElementById('p-components').appendChild(
-    el('div', 'p-empty', LABELS[currentLang].loading)
+    csmEl('div', 'p-empty', P().loading)
   );
   requestAndRender();
 });
 
-// ── Language switching ────────────────────────────────────────
-
-// ── Refresh button ────────────────────────────────────────────
+// ── Header actions ───────────────────────────────────────────
 
 document.getElementById('p-refresh-btn').addEventListener('click', (e) => {
   e.stopPropagation();
@@ -432,82 +363,40 @@ document.getElementById('p-refresh-btn').addEventListener('click', (e) => {
   });
 });
 
-document.getElementById('p-lang-btn').addEventListener('click', (e) => {
-  e.stopPropagation();
-  document.getElementById('p-lang-menu').classList.toggle('open');
+document.getElementById('p-lang-btn').addEventListener('click', () => {
+  currentLang = currentLang === 'de' ? 'en' : 'de';
+  chrome.storage.local.set({ [STORAGE_KEYS.LANG]: currentLang });
+  updateLangUI();
+  if (cachedResponse) renderAll(cachedResponse.summary ?? {}, cachedResponse.incidents ?? []);
 });
 
-document.querySelectorAll('.p-lang-option').forEach((opt) => {
-  opt.addEventListener('click', (e) => {
-    e.stopPropagation();
-    const lang = opt.dataset.lang;
-    document.getElementById('p-lang-menu').classList.remove('open');
-    if (lang === currentLang) return;
-    currentLang = lang;
-    chrome.storage.local.set({ [STORAGE_KEYS.LANG]: lang });
-    updateLangUI();
-    if (cachedResponse) renderAll(cachedResponse.summary ?? {}, cachedResponse.incidents ?? {});
-  });
-});
-
-document.addEventListener('click', () => {
-  document.getElementById('p-lang-menu').classList.remove('open');
-});
-
-// ── Theme toggle ──────────────────────────────────────────────
-
-document.getElementById('p-theme-btn').addEventListener('click', (e) => {
-  e.stopPropagation();
-  const next = currentTheme === 'dark' ? 'light' : 'dark';
-  applyTheme(next);
-  chrome.storage.local.set({ [STORAGE_KEYS.THEME]: next });
-});
-
-document.getElementById('p-setting-theme-btn').addEventListener('click', () => {
-  const next = currentTheme === 'dark' ? 'light' : 'dark';
+// Header button: quick explicit dark/light toggle. 'Auto' lives in settings.
+document.getElementById('p-theme-btn').addEventListener('click', () => {
+  const next = resolvePopupTheme(themeSetting) === 'dark' ? 'light' : 'dark';
   applyTheme(next);
   chrome.storage.local.set({ [STORAGE_KEYS.THEME]: next });
 });
 
 // ── Settings view ─────────────────────────────────────────────
 
-const LABELS_SETTINGS = {
-  de: {
-    title: 'Einstellungen',
-    theme: 'Erscheinungsbild',
-    themeDesc: 'Dark / Light Mode',
-    notify: 'Benachrichtigungen',
-    notifyDesc: 'Bei Störung & Erholung',
-    lang: 'Sprache',
-    interval: 'Aktualisierungsintervall',
-    intervalDesc: 'Wie oft Status geprüft wird',
-    intervals: { '0.5': '30 Sek.', '1': '1 Min.', '2': '2 Min.', '5': '5 Min.' },
-  },
-  en: {
-    title: 'Settings',
-    theme: 'Appearance',
-    themeDesc: 'Dark / Light Mode',
-    notify: 'Notifications',
-    notifyDesc: 'On incident & recovery',
-    lang: 'Language',
-    interval: 'Refresh interval',
-    intervalDesc: 'How often status is checked',
-    intervals: { '0.5': '30 sec', '1': '1 min', '2': '2 min', '5': '5 min' },
-  },
-};
-
 function updateSettingsLabels() {
-  const S = LABELS_SETTINGS[currentLang];
+  const S = UI_LABELS[currentLang].settings;
   document.getElementById('p-settings-title').textContent = S.title;
   document.getElementById('p-label-theme').textContent    = S.theme;
   document.getElementById('p-desc-theme').textContent     = S.themeDesc;
   document.getElementById('p-label-notify').textContent   = S.notify;
   document.getElementById('p-desc-notify').textContent    = S.notifyDesc;
+  document.getElementById('p-label-widget').textContent   = S.widget;
+  document.getElementById('p-desc-widget').textContent    = S.widgetDesc;
   document.getElementById('p-label-lang').textContent     = S.lang;
   document.getElementById('p-label-interval').textContent = S.interval;
   document.getElementById('p-desc-interval').textContent  = S.intervalDesc;
-  const sel = document.getElementById('p-setting-interval');
-  Array.from(sel.options).forEach(opt => {
+  const themeSel = document.getElementById('p-setting-theme');
+  Array.from(themeSel.options).forEach(opt => {
+    opt.textContent = S.themeOptions[opt.value] ?? opt.value;
+  });
+  const intervalSel = document.getElementById('p-setting-interval');
+  Array.from(intervalSel.options).forEach(opt => {
     opt.textContent = S.intervals[opt.value] ?? opt.value;
   });
 }
@@ -518,12 +407,16 @@ function openSettings() {
   updateSettingsLabels();
 
   // Load current values
-  chrome.storage.local.get([STORAGE_KEYS.THEME, STORAGE_KEYS.NOTIFY, STORAGE_KEYS.LANG, STORAGE_KEYS.INTERVAL], (stored) => {
-    document.getElementById('p-setting-theme-btn').textContent = (stored[STORAGE_KEYS.THEME] === 'light') ? '☀️' : '🌙';
-    document.getElementById('p-setting-notify').checked   = !!stored[STORAGE_KEYS.NOTIFY];
-    document.getElementById('p-setting-lang').value       = stored[STORAGE_KEYS.LANG] ?? 'de';
-    document.getElementById('p-setting-interval').value   = String(stored[STORAGE_KEYS.INTERVAL] ?? '1');
-  });
+  chrome.storage.local.get(
+    [STORAGE_KEYS.THEME, STORAGE_KEYS.NOTIFY, STORAGE_KEYS.LANG, STORAGE_KEYS.INTERVAL, STORAGE_KEYS.WIDGET_VISIBLE],
+    (stored) => {
+      document.getElementById('p-setting-theme').value    = stored[STORAGE_KEYS.THEME] ?? 'auto';
+      document.getElementById('p-setting-notify').checked = !!stored[STORAGE_KEYS.NOTIFY];
+      document.getElementById('p-setting-widget').checked = stored[STORAGE_KEYS.WIDGET_VISIBLE] !== false;
+      document.getElementById('p-setting-lang').value     = currentLang;
+      document.getElementById('p-setting-interval').value = String(stored[STORAGE_KEYS.INTERVAL] ?? '1');
+    }
+  );
 }
 
 function closeSettings() {
@@ -538,18 +431,24 @@ document.getElementById('p-settings-btn').addEventListener('click', (e) => {
 
 document.getElementById('p-settings-back').addEventListener('click', closeSettings);
 
+document.getElementById('p-setting-theme').addEventListener('change', (e) => {
+  applyTheme(e.target.value);
+  chrome.storage.local.set({ [STORAGE_KEYS.THEME]: e.target.value });
+});
 
 document.getElementById('p-setting-notify').addEventListener('change', (e) => {
   chrome.storage.local.set({ [STORAGE_KEYS.NOTIFY]: e.target.checked });
 });
 
+document.getElementById('p-setting-widget').addEventListener('change', (e) => {
+  chrome.storage.local.set({ [STORAGE_KEYS.WIDGET_VISIBLE]: e.target.checked });
+});
+
 document.getElementById('p-setting-lang').addEventListener('change', (e) => {
-  const lang = e.target.value;
-  currentLang = lang;
-  chrome.storage.local.set({ [STORAGE_KEYS.LANG]: lang });
+  currentLang = e.target.value;
+  chrome.storage.local.set({ [STORAGE_KEYS.LANG]: currentLang });
   updateLangUI();
-  updateSettingsLabels();
-  if (cachedResponse) renderAll(cachedResponse.summary ?? {}, cachedResponse.incidents ?? {});
+  if (cachedResponse) renderAll(cachedResponse.summary ?? {}, cachedResponse.incidents ?? []);
 });
 
 document.getElementById('p-setting-interval').addEventListener('change', (e) => {

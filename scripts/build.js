@@ -38,7 +38,7 @@ const MANIFEST_BASE = {
   version,
   description: 'Displays the real-time Anthropic service status directly on claude.ai. Supports German and English.',
   author: 'jstin-cc',
-  homepage_url: 'https://github.com/jstin-cc/Claude-Status-Firefox-Extension',
+  homepage_url: 'https://github.com/jstin-cc/Claude-Status-Extension',
   action: {
     default_popup: 'popup.html',
     default_icon: {
