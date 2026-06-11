@@ -173,7 +173,7 @@ claude-status-extension-chrome-v3/    ← Chrome build target
 dist/                                 ← build output (.zip, gitignored)
 ```
 
-Edit files in `src/`, then run `npm run build` to sync to both extension directories and generate browser-specific manifests. Use `npm run build -- --zip` to also create distribution ZIPs. Pushing a version tag (`v*`) triggers a GitHub Actions workflow that builds both ZIPs and publishes them as a GitHub Release.
+Edit files in `src/`, then run `npm run build` to sync to both extension directories and generate browser-specific manifests. Use `npm run build -- --zip` to also create distribution ZIPs. A GitHub Actions workflow publishes both ZIPs as a GitHub Release whenever a new `package.json` version lands on `main` (or a `v*` tag is pushed).
 
 ---
 

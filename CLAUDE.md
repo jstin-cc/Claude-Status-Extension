@@ -47,9 +47,12 @@ npm run build -- --chrome   # Chrome only
 
 The manifest version is stamped from `package.json` (`4.0.0` → `"4.0"`).
 
-**Releases:** pushing a `v*` tag triggers `.github/workflows/release.yml`, which
-lints/tests, builds both ZIPs and publishes them as a GitHub Release. `dist/`
-is gitignored — ZIP artifacts live on the Releases page, not in git.
+**Releases:** `.github/workflows/release.yml` lints/tests, builds both ZIPs
+and publishes them as a GitHub Release. It runs on every push to `main`
+(releases the `package.json` version exactly once — existing releases are
+skipped), on `v*` tag pushes, and via manual dispatch. So: bump the version,
+merge to main, done. `dist/` is gitignored — ZIP artifacts live on the
+Releases page, not in git.
 
 #### AMO upload gotcha (Windows) — DO NOT use PowerShell Compress-Archive
 On Windows, `Compress-Archive` writes ZIP entries using backslash path
