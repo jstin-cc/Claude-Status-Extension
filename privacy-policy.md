@@ -1,6 +1,6 @@
 # Privacy Policy — Claude Status Monitor
 
-**Last updated: 2026-04-07**
+**Last updated: 2026-06-11**
 
 ## Overview
 
@@ -26,23 +26,30 @@ This is the official public Anthropic status API. The requests contain no user d
 
 ## Local Storage
 
-The extension stores the following data locally in the browser using `browser.storage.local` (Firefox) or `chrome.storage.local` (Chrome):
+The extension stores the following preferences locally in the browser using `browser.storage.local` (Firefox) or `chrome.storage.local` (Chrome):
 
 | Key | Value | Purpose |
 |-----|-------|---------|
-| `lang` | `"de"` or `"en"` | Language preference |
-| `expanded` | `true` or `false` | Widget expand/collapse state |
+| `csm-lang` | `"de"` or `"en"` | Language preference |
+| `csm-theme` | `"auto"`, `"dark"` or `"light"` | Theme preference |
+| `csm-expanded` | `true` / `false` | Widget expand/collapse state |
+| `csm-notify` | `true` / `false` | Notifications on/off |
+| `csm-poll-interval` | number | Status refresh interval |
+| `csm-widget-visible` | `true` / `false` | Widget visibility on claude.ai |
+| `csm-cache` | last fetched status payload | Warm start after a browser restart (≤ 10 min) |
 
-This data never leaves the device.
+In addition, ephemeral worker state (`csm-bg-state`: last overall status, error counter, cached payload) lives in `browser.storage.session` and is cleared automatically when the browser closes.
+
+All of this is non-personal UI/state data. It never leaves the device.
 
 ## Permissions
 
 | Permission | Reason |
 |------------|--------|
-| `alarms` | Triggers periodic status refresh (every 60s / 5min) |
+| `alarms` | Triggers periodic status refresh (configurable: 30 s – 5 min) |
 | `tabs` | Sends updated status to open claude.ai tabs |
-| `storage` | Persists language and UI preferences locally |
-| `notifications` | Shows browser notifications for status changes (Chrome only) |
+| `storage` | Persists the preferences listed above locally |
+| `notifications` | Shows browser notifications on status change and recovery |
 | `https://claude.ai/*` | Injects the status widget into the page |
 | `https://status.anthropic.com/*` | Fetches the public status API |
 
@@ -57,4 +64,4 @@ If this policy changes, the updated version will be committed to this repository
 ## Contact
 
 For questions or concerns, open an issue at:
-[https://github.com/jstin-cc/Claude-Status-Firefox-Extension/issues](https://github.com/jstin-cc/Claude-Status-Firefox-Extension/issues)
+[https://github.com/jstin-cc/Claude-Status-Extension/issues](https://github.com/jstin-cc/Claude-Status-Extension/issues)

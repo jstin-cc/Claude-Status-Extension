@@ -20,8 +20,8 @@ scripts/build.js                  ← build script (sync + manifest gen + zip)
 tests/shared.test.js              ← unit tests (vitest) for shared.js
 claude-status-extension-firefox-v3/ ← Firefox (build target, generated)
 claude-status-extension-chrome-v3/  ← Chrome (build target, generated)
-dist/                             ← packaged releases (.zip)
-sync.ps1                          ← legacy sync (PowerShell, no manifest gen)
+dist/                             ← build output (.zip, gitignored)
+sync-hook.ps1                     ← optional local hook: rebuild on src/ edits
 ```
 
 **Workflow:** Edit files in `src/`, then run `node scripts/build.js` (or `npm run build`) to sync to both extension directories and generate manifests. Never edit the build-target directories directly.
@@ -46,6 +46,10 @@ npm run build -- --chrome   # Chrome only
 ```
 
 The manifest version is stamped from `package.json` (`4.0.0` → `"4.0"`).
+
+**Releases:** pushing a `v*` tag triggers `.github/workflows/release.yml`, which
+lints/tests, builds both ZIPs and publishes them as a GitHub Release. `dist/`
+is gitignored — ZIP artifacts live on the Releases page, not in git.
 
 #### AMO upload gotcha (Windows) — DO NOT use PowerShell Compress-Archive
 On Windows, `Compress-Archive` writes ZIP entries using backslash path

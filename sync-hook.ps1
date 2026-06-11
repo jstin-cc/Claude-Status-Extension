@@ -1,7 +1,7 @@
-# sync-hook.ps1 — PostToolUse hook: auto-sync src/ after edits
-# Reads Claude Code hook JSON from stdin, runs sync.ps1 if a src/ file was changed.
+# sync-hook.ps1 — PostToolUse hook: auto-build after src/ edits
+# Reads Claude Code hook JSON from stdin, runs the build if a src/ file changed.
 $data = $input | ConvertFrom-Json
 $f = $data.tool_input.file_path
 if ($f -like '*/src/*' -or $f -like '*\src\*' -or $f -like 'src/*' -or $f -like 'src\*') {
-    & "$PSScriptRoot\sync.ps1"
+    node (Join-Path $PSScriptRoot 'scripts/build.js')
 }
