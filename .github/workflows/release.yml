@@ -1,0 +1,38 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - run: npm install
+
+      - name: Lint & test
+        run: |
+          npm run lint
+          npm test
+
+      - name: Build & package
+        run: npm run build -- --zip
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.zip \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            --notes "Attached: Firefox and Chrome ZIPs (AMO-compliant forward-slash paths). Full changelog: [CHANGES.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGES.md)."
