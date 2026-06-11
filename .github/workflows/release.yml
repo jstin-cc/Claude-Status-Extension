@@ -3,6 +3,11 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release, e.g. v4.0.0 (created at the run''s commit if missing)'
+        required: true
 
 permissions:
   contents: write
@@ -31,8 +36,10 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.zip \
-            --title "$GITHUB_REF_NAME" \
+          gh release create "$TAG" dist/*.zip \
+            --target "$GITHUB_SHA" \
+            --title "$TAG" \
             --generate-notes \
             --notes "Attached: Firefox and Chrome ZIPs (AMO-compliant forward-slash paths). Full changelog: [CHANGES.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGES.md)."
