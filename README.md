@@ -114,7 +114,7 @@ The background service worker fetches and caches status data, broadcasts updates
 ## Installation
 
 ### Firefox — From AMO
-Install from [addons.mozilla.org](https://addons.mozilla.org) or sideload the `.xpi` from the [Releases](../../releases) page.
+Install from [addons.mozilla.org](https://addons.mozilla.org) or download the extension ZIP from the [Releases](../../releases) page (the AMO-signed `.xpi` is attached to a release once review completes).
 
 ### Firefox — Manual (Developer)
 1. Clone or download this repository
@@ -170,10 +170,10 @@ scripts/build.js                      ← build script (sync + manifest gen + zi
 tests/                                ← unit tests (vitest)
 claude-status-extension-firefox-v3/   ← Firefox build target
 claude-status-extension-chrome-v3/    ← Chrome build target
-dist/                                 ← packaged releases (.zip)
+dist/                                 ← build output (.zip, gitignored)
 ```
 
-Edit files in `src/`, then run `npm run build` to sync to both extension directories and generate browser-specific manifests. Use `npm run build -- --zip` to also create distribution ZIPs.
+Edit files in `src/`, then run `npm run build` to sync to both extension directories and generate browser-specific manifests. Use `npm run build -- --zip` to also create distribution ZIPs. Pushing a version tag (`v*`) triggers a GitHub Actions workflow that builds both ZIPs and publishes them as a GitHub Release.
 
 ---
 
