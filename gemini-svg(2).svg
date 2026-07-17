@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" width="100%" height="100%">
+  <style>
+    .line-art {
+      fill: none;
+      stroke: #1D111D;
+      stroke-width: 8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .thin-line-art {
+      fill: none;
+      stroke: #1D111D;
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  </style>
+
+  <!-- STROHHALM -->
+  <path class="line-art" d="M 30 20 L 150 80 L 210 295" />
+
+  <!-- ORANGENSCHEIBE -->
+  <g transform="translate(290, 175) rotate(-50)">
+    <!-- Äußere Schale -->
+    <path class="line-art" d="M -70 0 A 70 70 0 1 1 70 0 Z" />
+    <!-- Innere Fruchtfleisch-Linie -->
+    <path class="thin-line-art" d="M -58 0 A 58 58 0 1 1 58 0 Z" />
+    <!-- Segmente -->
+    <line class="thin-line-art" x1="0" y1="0" x2="0" y2="-58" />
+    <line class="thin-line-art" x1="0" y1="0" x2="41" y2="-41" />
+    <line class="thin-line-art" x1="0" y1="0" x2="56" y2="-15" />
+    <line class="thin-line-art" x1="0" y1="0" x2="-41" y2="-41" />
+    <line class="thin-line-art" x1="0" y1="0" x2="-56" y2="-15" />
+  </g>
+
+  <!-- FLÜSSIGKEITSOBERFLÄCHE (Welle) -->
+  <path class="line-art" d="M 111 305 C 145 285, 175 285, 200 300 C 225 315, 255 325, 289 310" />
+
+  <!-- EISWÜRFEL -->
+  <!-- Eiswürfel 1 -->
+  <g>
+    <polygon class="thin-line-art" points="150,335 175,320 200,335 175,350" />
+    <polygon class="thin-line-art" points="150,335 150,365 175,380 175,350" />
+    <polygon class="thin-line-art" points="175,350 175,380 200,365 200,335" />
+  </g>
+
+  <!-- Eiswürfel 2 -->
+  <g transform="translate(70, -35) rotate(15, 175, 350)">
+    <polygon class="thin-line-art" points="150,335 175,320 200,335 175,350" />
+    <polygon class="thin-line-art" points="150,335 150,365 175,380 175,350" />
+    <polygon class="thin-line-art" points="175,350 175,380 200,365 200,335" />
+  </g>
+
+  <!-- Eiswürfel 3 -->
+  <g transform="translate(45, 30) rotate(-10, 175, 350)">
+    <polygon class="thin-line-art" points="150,335 175,320 200,335 175,350" />
+    <polygon class="thin-line-art" points="150,335 150,365 175,380 175,350" />
+    <polygon class="thin-line-art" points="175,350 175,380 200,365 200,335" />
+  </g>
+
+  <!-- GLASKELCH -->
+  <path class="line-art" d="M 140 180 L 260 180 C 265 220, 290 260, 290 320 C 290 390, 250 430, 200 430 C 150 430, 110 390, 110 320 C 110 260, 135 220, 140 180 Z" />
+
+  <!-- GLASSTIEL -->
+  <line class="line-art" x1="200" y1="430" x2="200" y2="540" />
+
+  <!-- GLASFUSS -->
+  <path class="line-art" d="M 150 565 L 250 565 C 250 540, 150 540, 150 565 Z" />
+</svg>
