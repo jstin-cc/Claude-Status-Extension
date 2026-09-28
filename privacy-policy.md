@@ -38,7 +38,7 @@ The extension stores the following preferences locally in the browser using `bro
 | `csm-widget-visible` | `true` / `false` | Widget visibility on claude.ai |
 | `csm-cache` | last fetched status payload | Warm start after a browser restart (≤ 10 min) |
 
-In addition, ephemeral worker state (`csm-bg-state`: last overall status, error counter, cached payload) lives in `browser.storage.session` and is cleared automatically when the browser closes.
+In addition, ephemeral worker state (`csm-bg-state`: last overall status, pending status change, error counter, cached payload; `csm-bg-incidents`: cached incident history) lives in `browser.storage.session` and is cleared automatically when the browser closes.
 
 All of this is non-personal UI/state data. It never leaves the device.
 
@@ -47,7 +47,6 @@ All of this is non-personal UI/state data. It never leaves the device.
 | Permission | Reason |
 |------------|--------|
 | `alarms` | Triggers periodic status refresh (configurable: 30 s – 5 min) |
-| `tabs` | Sends updated status to open claude.ai tabs |
 | `storage` | Persists the preferences listed above locally |
 | `notifications` | Shows browser notifications on status change and recovery |
 | `https://claude.ai/*` | Injects the status widget into the page |

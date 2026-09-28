@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Claude Status Monitor",
-  "version": "4.0",
+  "version": "4.1",
   "description": "Displays the real-time Anthropic service status directly on claude.ai. Supports German and English.",
   "author": "jstin-cc",
   "homepage_url": "https://github.com/jstin-cc/Claude-Status-Extension",
@@ -15,7 +15,6 @@
   },
   "permissions": [
     "alarms",
-    "tabs",
     "storage",
     "notifications"
   ],

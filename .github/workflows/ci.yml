@@ -11,13 +11,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
+          cache: npm
 
-      - run: npm install
+      - run: npm ci
 
       - name: Lint
         run: npm run lint
@@ -30,25 +31,23 @@ jobs:
     needs: lint-and-test
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
+          cache: npm
 
-      - run: npm install
+      - run: npm ci
 
       - name: Build & package
         run: npm run build -- --zip
 
-      - name: Verify manifests generated
-        run: |
-          diff <(cat claude-status-extension-firefox-v3/manifest.json) /dev/null > /dev/null 2>&1 && exit 1 || true
-          grep '"version"' claude-status-extension-firefox-v3/manifest.json
-          grep '"version"' claude-status-extension-chrome-v3/manifest.json
+      - name: Verify build output
+        run: node scripts/verify-build.js
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: extension-zips
           path: dist/*.zip

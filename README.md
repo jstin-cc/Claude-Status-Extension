@@ -5,7 +5,7 @@ A Firefox and Chrome extension that displays the real-time operational status of
 ![Firefox](https://img.shields.io/badge/Firefox-140%2B-orange?logo=firefox)
 ![Chrome](https://img.shields.io/badge/Chrome-MV3-blue?logo=googlechrome)
 ![Manifest V3](https://img.shields.io/badge/Manifest-V3-blue)
-![Version](https://img.shields.io/badge/Version-4.0-brightgreen)
+![Version](https://img.shields.io/badge/Version-4.1-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 ---
@@ -38,6 +38,22 @@ A Firefox and Chrome extension that displays the real-time operational status of
 - **Persistent settings** — all preferences saved locally via `browser.storage.local`
 
 ---
+
+## What's New in v4.1
+
+### Fixed
+- **Resolved incidents with a postmortem** now show up in the popup history (they were filtered out by status).
+- **Popup stays usable** when `incidents.json` fails: components and status still render, only chart and history are marked unavailable.
+- **Refresh button** now also reloads the incident history instead of serving it from the 2-min cache.
+- **Uptime chart and status dot agree**: incident impact maps through the same status enum as the overall indicator (minor = yellow, major = orange, critical = red), on local calendar days.
+- **Orphaned widget after an extension update** (Chrome) removes itself instead of showing frozen data.
+
+### Changed
+- **Toolbar badge follows the overall status**: incident count, or a dot when a component is degraded without an incident; the icon tooltip names the current status.
+- **Notifications**: a change must hold for two consecutive polls (no bursts from flapping components), newer notifications replace older ones, clicking one opens status.anthropic.com, all texts come from `UI_LABELS`.
+- **Accessibility**: the widget's expand toggle is a real `<button>`; language/theme buttons are no longer nested inside it.
+- **Fewer permissions**: `tabs` dropped (the host permission covers messaging claude.ai tabs).
+- **Tooling**: Node 24 + `npm ci` in CI/release, clean build targets, `scripts/verify-build.js` checks manifests and referenced files.
 
 ## What's New in v4.0
 
@@ -182,7 +198,6 @@ Edit files in `src/`, then run `npm run build` to sync to both extension directo
 | Permission | Reason |
 |------------|--------|
 | `alarms` | Triggers periodic status refresh |
-| `tabs` | Sends updated status data to open claude.ai tabs |
 | `storage` | Persists theme, language, notification, and interval settings |
 | `notifications` | Shows browser notifications on incident and recovery |
 | `https://claude.ai/*` | Injects the status widget |

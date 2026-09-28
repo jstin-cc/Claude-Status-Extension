@@ -17,6 +17,7 @@ src/                              ← shared source — edit here
   popup.js/.html/.css             ← toolbar popup
   icons/                          ← PNG + SVG icons
 scripts/build.js                  ← build script (sync + manifest gen + zip)
+scripts/verify-build.js           ← CI check: manifests + referenced files
 tests/shared.test.js              ← unit tests (vitest) for shared.js
 claude-status-extension-firefox-v3/ ← Firefox (build target, generated)
 claude-status-extension-chrome-v3/  ← Chrome (build target, generated)
@@ -45,7 +46,10 @@ npm run build -- --firefox  # Firefox only
 npm run build -- --chrome   # Chrome only
 ```
 
-The manifest version is stamped from `package.json` (`4.0.0` → `"4.0"`).
+The manifest version is stamped from `package.json` (`4.1.0` → `"4.1"`).
+The build wipes each target directory first, so files removed from `src/`
+disappear from the targets too. `node scripts/verify-build.js` (run by CI)
+checks both manifests (version, referenced files).
 
 **Releases:** `.github/workflows/release.yml` lints/tests, builds both ZIPs
 and publishes them as a GitHub Release. It runs on every push to `main`
@@ -103,14 +107,18 @@ status.anthropic.com/api/v2/incidents.json  ← fetched on demand for the popup
 
 **MV3 lifecycle rule:** Chrome kills the service worker after ~30s idle and
 Firefox suspends the event page, so **no mutable state may live in module
-scope**. All state (`{ lastStatus, consecutiveErrors, payload, incidents,
-incidentsFetchedAt }`) lives in `chrome.storage.session` (fallback
+scope**. All state (`{ lastStatus, pendingStatus, consecutiveErrors, payload }` under
+`csm-bg-state`, plus `{ incidents, fetchedAt }` under `csm-bg-incidents` so
+the per-poll write stays small) lives in `chrome.storage.session` (fallback
 `storage.local`) and is hydrated lazily: every entry point (`onAlarm`,
 message handlers, `onInstalled`, `onStartup`) starts with `await getState()`.
 `storage.local[csm-cache]` additionally persists the last payload across
 browser restarts (10-min TTL warm start). Notification baselines compare
-status strings via `isWorseStatus`/`isRecoveryStatus` from shared.js — never
-colors.
+status strings via `nextNotifyState` (built on `isWorseStatus`/
+`isRecoveryStatus`) from shared.js — never colors. A change must be seen on
+`NOTIFY_CONFIRM_POLLS` consecutive polls before it notifies (flap guard).
+Toolbar badge + tooltip come from `getBadgeState()` (overall status, not just
+incidents).
 
 Fetches are **single-flight** (`fetchSummaryOnce`/`fetchIncidentsOnce`): the
 alarm tick, the `GET_STATUS` cold path and `FORCE_FETCH` share one in-flight
@@ -131,8 +139,10 @@ everywhere:
 
 ### Message types
 - `GET_STATUS` → `{ type: 'STATUS_DATA', payload }` or `{ type: 'STATUS_ERROR', code }`
-- `GET_SUMMARY` → `{ summary: payload, incidents: [...], incidentsFetchedAt }` or `{ error: true, code }`
-- `FORCE_FETCH` → `{ ok: boolean }`
+- `GET_SUMMARY` → `{ summary: payload, incidents: [...], incidentsFetchedAt }`,
+  or `{ summary: payload, incidents: null, incidentsError }` when only
+  incidents.json failed, or `{ error: true, code }`
+- `FORCE_FETCH` (`{ incidents: true }` also bypasses the incidents TTL) → `{ ok: boolean }`
 - Broadcasts to claude.ai tabs reuse `STATUS_DATA` / `STATUS_ERROR`.
 
 ### content.js (widget)
@@ -144,6 +154,11 @@ everywhere:
   2s location poll (Firefox fallback). Do NOT monkey-patch
   `history.pushState` — content scripts run in an isolated world and can
   never observe page-initiated calls.
+- **Header**: `#csm-toggle` is a native `<button>` (dot, title, chevron);
+  the lang/theme buttons are its siblings — never nest controls in it.
+- **Orphan rule**: after an extension update Chrome leaves the old content
+  script running with a dead `chrome.runtime`. `removeIfOrphaned()` (checked
+  by the 30s timer and before every chrome.* write) removes the widget.
 - **Teardown rule**: every listener/observer/interval must be cleaned up when
   the widget node disappears (see the cleanup MutationObserver): the
   `AbortController` signal for DOM listeners, `removeListener` for
@@ -184,11 +199,16 @@ Key scenarios:
 - Timestamp shows data age; goes amber (`.csm-stale`) after 5 min (e.g. offline)
 - Active incident shows a banner in the expanded widget
 - Notifications: with the SW inactive (chrome://extensions), a status flip
-  must produce exactly one notification (state lives in storage.session)
+  must produce exactly one notification (state lives in storage.session),
+  after the change held for two polls; a one-poll blip produces none.
+  Clicking the notification opens status.anthropic.com
+- Badge: count for incidents, dot for a degraded component without incident;
+  tooltip names the status in the chosen language
 - Network tab: only `summary.json` per poll; `incidents.json` only on popup open
 - Widget visibility toggle in popup settings hides/shows live
 
 ## Key Constraints
+- **Permissions** — `alarms`, `storage`, `notifications` + host permissions only; no `tabs` (host permission covers `tabs.query({ url })`). Don't add permissions that trigger new install warnings without need.
 
 - **Firefox + Chrome** — uses `chrome.*` APIs (Firefox aliases them); Firefox strict_min_version 140 desktop / 142 Android
 - **No tracking** — the only outbound requests are to status.anthropic.com

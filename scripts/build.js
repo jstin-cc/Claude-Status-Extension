@@ -12,7 +12,7 @@
  *   node scripts/build.js --zip       # also create dist/ ZIPs
  */
 
-import { copyFileSync, cpSync, mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { copyFileSync, cpSync, mkdirSync, readFileSync, rmSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
@@ -47,7 +47,9 @@ const MANIFEST_BASE = {
       '128': 'icons/icon-128.png',
     },
   },
-  permissions: ['alarms', 'tabs', 'storage', 'notifications'],
+  // No 'tabs': tabs.query({ url }) for claude.ai is covered by the host
+  // permission, and 'tabs' would add a "read your browsing history" warning.
+  permissions: ['alarms', 'storage', 'notifications'],
   host_permissions: [
     'https://claude.ai/*',
     'https://status.anthropic.com/*',
@@ -121,6 +123,11 @@ const selectedTargets = onlyFirefox
 function syncFiles(targetDir) {
   const dest = join(ROOT, targetDir);
   const src = join(ROOT, 'src');
+
+  // Start from an empty target so files deleted from src/ can't linger in
+  // the build dirs (and from there in the store ZIPs).
+  rmSync(dest, { recursive: true, force: true });
+  mkdirSync(dest, { recursive: true });
 
   for (const file of SHARED_FILES) {
     copyFileSync(join(src, file), join(dest, file));
