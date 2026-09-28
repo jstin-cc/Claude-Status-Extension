@@ -38,7 +38,9 @@ function loadShared() {
     // Strip 'use strict' so we can capture top-level declarations via `this`
     sharedSource.replace(/^'use strict';?\s*/, '') +
     '\nreturn { CSM_CONFIG, STORAGE_KEYS, STATUS_COLOR, STATUS_PRIORITY, ' +
-    'INDICATOR_STATUS, getOverallStatus, getOverallColor, isWorseStatus, ' +
+    'INDICATOR_STATUS, getOverallStatus, isWorseStatus, ' +
+    'getImpactStatus, worseStatus, nextNotifyState, getRecentResolvedIncidents, ' +
+    'getDailyStatuses, BADGE_COLORS, getBadgeState, buildNotificationMessage, detectLang, ' +
     'isRecoveryStatus, buildStatusPayload, validateSummary, validateIncidents, ' +
     'classifyFetchError, formatLastChecked, UI_LABELS, ' +
     'ERROR_CODES, ERROR_LABELS, SHARED_STATUS_LABELS, csmEl, csmIcon, ICON_PATHS };'
@@ -79,7 +81,7 @@ describe('CSM_CONFIG', () => {
 
 describe('STORAGE_KEYS', () => {
   it('has all expected keys', () => {
-    const keys = ['LANG', 'THEME', 'EXPANDED', 'NOTIFY', 'INTERVAL', 'CACHE', 'BG_STATE', 'WIDGET_VISIBLE'];
+    const keys = ['LANG', 'THEME', 'EXPANDED', 'NOTIFY', 'INTERVAL', 'CACHE', 'BG_STATE', 'BG_INCIDENTS', 'WIDGET_VISIBLE'];
     for (const k of keys) {
       expect(shared.STORAGE_KEYS).toHaveProperty(k);
       expect(typeof shared.STORAGE_KEYS[k]).toBe('string');
@@ -179,61 +181,6 @@ describe('getOverallStatus', () => {
   });
 });
 
-// ── getOverallColor ───────────────────────────────────────
-
-describe('getOverallColor', () => {
-  it('returns green for all-operational components', () => {
-    const comps = [
-      { name: 'API', status: 'operational' },
-      { name: 'Web', status: 'operational' },
-    ];
-    expect(shared.getOverallColor(comps)).toBe('green');
-  });
-
-  it('returns the worst status color', () => {
-    const comps = [
-      { name: 'API', status: 'operational' },
-      { name: 'Web', status: 'partial_outage' },
-    ];
-    expect(shared.getOverallColor(comps)).toBe('orange');
-  });
-
-  it('skips group-header components', () => {
-    const comps = [
-      { name: 'Group', status: 'major_outage', group: true },
-      { name: 'API', status: 'operational' },
-    ];
-    expect(shared.getOverallColor(comps)).toBe('green');
-  });
-
-  it('returns green for empty array', () => {
-    expect(shared.getOverallColor([])).toBe('green');
-  });
-
-  it('returns yellow for degraded_performance', () => {
-    const comps = [
-      { name: 'API', status: 'degraded_performance' },
-      { name: 'Web', status: 'operational' },
-    ];
-    expect(shared.getOverallColor(comps)).toBe('yellow');
-  });
-
-  it('major_outage overrides everything', () => {
-    const comps = [
-      { name: 'API', status: 'degraded_performance' },
-      { name: 'Web', status: 'partial_outage' },
-      { name: 'DB', status: 'major_outage' },
-    ];
-    expect(shared.getOverallColor(comps)).toBe('red');
-  });
-
-  it('handles unknown status gracefully', () => {
-    const comps = [{ name: 'X', status: 'some_new_status' }];
-    const result = shared.getOverallColor(comps);
-    expect(typeof result).toBe('string');
-  });
-});
-
 // ── isWorseStatus / isRecoveryStatus ──────────────────────
 // Regression tests for the v3 bug where color-keyed rank maps lacked
 // 'yellow', so degraded_performance counted as operational.
@@ -278,6 +225,231 @@ describe('isRecoveryStatus', () => {
 
   it('operational → operational is not a recovery', () => {
     expect(shared.isRecoveryStatus('operational', 'operational')).toBe(false);
+  });
+});
+
+// ── nextNotifyState (flap guard) ─────────────────────────
+
+describe('nextNotifyState', () => {
+  const N = 2;
+
+  it('first observation only sets the baseline', () => {
+    expect(shared.nextNotifyState(null, null, 'partial_outage', N))
+      .toEqual({ baseline: 'partial_outage', pending: null, notify: null });
+  });
+
+  it('unchanged status clears any pending change', () => {
+    const r = shared.nextNotifyState('operational', { status: 'major_outage', count: 1 }, 'operational', N);
+    expect(r).toEqual({ baseline: 'operational', pending: null, notify: null });
+  });
+
+  it('a single-poll blip never notifies', () => {
+    let r = shared.nextNotifyState('operational', null, 'degraded_performance', N);
+    expect(r.notify).toBeNull();
+    expect(r.pending).toEqual({ status: 'degraded_performance', count: 1 });
+    r = shared.nextNotifyState(r.baseline, r.pending, 'operational', N);
+    expect(r).toEqual({ baseline: 'operational', pending: null, notify: null });
+  });
+
+  it('a change confirmed on consecutive polls notifies once', () => {
+    let r = shared.nextNotifyState('operational', null, 'partial_outage', N);
+    r = shared.nextNotifyState(r.baseline, r.pending, 'partial_outage', N);
+    expect(r).toEqual({ baseline: 'partial_outage', pending: null, notify: 'worse' });
+    r = shared.nextNotifyState(r.baseline, r.pending, 'partial_outage', N);
+    expect(r.notify).toBeNull();
+  });
+
+  it('flapping every poll stays silent', () => {
+    let r = { baseline: 'operational', pending: null };
+    for (let i = 0; i < 10; i++) {
+      r = shared.nextNotifyState(r.baseline, r.pending, i % 2 ? 'operational' : 'degraded_performance', N);
+      expect(r.notify).toBeNull();
+    }
+  });
+
+  it('a different pending status restarts the count', () => {
+    let r = shared.nextNotifyState('operational', null, 'degraded_performance', N);
+    r = shared.nextNotifyState(r.baseline, r.pending, 'major_outage', N);
+    expect(r.notify).toBeNull();
+    expect(r.pending).toEqual({ status: 'major_outage', count: 1 });
+  });
+
+  it('confirmed recovery notifies as recovery', () => {
+    let r = shared.nextNotifyState('major_outage', null, 'operational', N);
+    r = shared.nextNotifyState(r.baseline, r.pending, 'operational', N);
+    expect(r.notify).toBe('recovery');
+  });
+
+  it('confirmed improvement short of operational moves the baseline silently', () => {
+    let r = shared.nextNotifyState('major_outage', null, 'degraded_performance', N);
+    r = shared.nextNotifyState(r.baseline, r.pending, 'degraded_performance', N);
+    expect(r).toEqual({ baseline: 'degraded_performance', pending: null, notify: null });
+  });
+
+  it('confirmPolls of 1 notifies immediately', () => {
+    expect(shared.nextNotifyState('operational', null, 'major_outage', 1).notify).toBe('worse');
+  });
+});
+
+// ── buildNotificationMessage ──────────────────────────────
+
+describe('buildNotificationMessage', () => {
+  it('recovery message in both languages', () => {
+    expect(shared.buildNotificationMessage('recovery', 'operational', [], 'de')).toBe(shared.UI_LABELS.de.notify.recovered);
+    expect(shared.buildNotificationMessage('recovery', 'operational', [], 'en')).toBe(shared.UI_LABELS.en.notify.recovered);
+  });
+
+  it('names the first active incident', () => {
+    const msg = shared.buildNotificationMessage('worse', 'partial_outage', [{ name: 'API errors' }], 'en');
+    expect(msg).toBe('Active incident: API errors');
+  });
+
+  it('falls back to the localized status label', () => {
+    expect(shared.buildNotificationMessage('worse', 'partial_outage', [], 'de')).toBe('Dienststatus: Teilausfall');
+  });
+});
+
+// ── detectLang ────────────────────────────────────────────
+
+describe('detectLang', () => {
+  it('maps any German locale to de, everything else to en', () => {
+    expect(shared.detectLang('de-AT')).toBe('de');
+    expect(shared.detectLang('DE')).toBe('de');
+    expect(shared.detectLang('en-US')).toBe('en');
+    expect(shared.detectLang('fr')).toBe('en');
+    expect(shared.detectLang(undefined)).toBe('en');
+  });
+});
+
+// ── Impact mapping ────────────────────────────────────────
+
+describe('getImpactStatus / worseStatus', () => {
+  it('maps incident impact through the same enum as the indicator', () => {
+    expect(shared.getImpactStatus('minor')).toBe('degraded_performance');
+    expect(shared.getImpactStatus('major')).toBe('partial_outage');
+    expect(shared.getImpactStatus('critical')).toBe('major_outage');
+    expect(shared.getImpactStatus('maintenance')).toBe('under_maintenance');
+    expect(shared.getImpactStatus('none')).toBe('operational');
+    expect(shared.getImpactStatus(undefined)).toBe('operational');
+  });
+
+  it('worseStatus picks the higher priority', () => {
+    expect(shared.worseStatus('operational', 'partial_outage')).toBe('partial_outage');
+    expect(shared.worseStatus('major_outage', 'degraded_performance')).toBe('major_outage');
+  });
+});
+
+// ── getRecentResolvedIncidents ────────────────────────────
+
+describe('getRecentResolvedIncidents', () => {
+  const NOW = Date.parse('2026-06-10T12:00:00Z');
+  const hoursAgo = (h) => new Date(NOW - h * 3600000).toISOString();
+
+  it('includes postmortem incidents (resolved_at set, status postmortem)', () => {
+    const list = [{ name: 'Big outage', status: 'postmortem', resolved_at: hoursAgo(5) }];
+    expect(shared.getRecentResolvedIncidents(list, NOW, 7, 5)).toHaveLength(1);
+  });
+
+  it('skips unresolved and out-of-window incidents', () => {
+    const list = [
+      { name: 'ongoing', status: 'investigating', resolved_at: null },
+      { name: 'old', status: 'resolved', resolved_at: hoursAgo(24 * 8) },
+      { name: 'recent', status: 'resolved', resolved_at: hoursAgo(1) },
+    ];
+    expect(shared.getRecentResolvedIncidents(list, NOW, 7, 5).map((i) => i.name)).toEqual(['recent']);
+  });
+
+  it('sorts newest first and respects the limit', () => {
+    const list = [3, 1, 2].map((h) => ({ name: `h${h}`, status: 'resolved', resolved_at: hoursAgo(h) }));
+    expect(shared.getRecentResolvedIncidents(list, NOW, 7, 2).map((i) => i.name)).toEqual(['h1', 'h2']);
+  });
+
+  it('handles undefined input', () => {
+    expect(shared.getRecentResolvedIncidents(undefined, NOW, 7, 5)).toEqual([]);
+  });
+});
+
+// ── getDailyStatuses ──────────────────────────────────────
+
+describe('getDailyStatuses', () => {
+  // Local noon, so the test holds in any timezone
+  const NOW = new Date(2026, 5, 10, 12, 0, 0).getTime();
+  const localDay = (d, h) => new Date(2026, 5, d, h, 0, 0).toISOString();
+
+  it('returns one entry per day, oldest first, ending today', () => {
+    const days = shared.getDailyStatuses([], 'operational', NOW, 7);
+    expect(days).toHaveLength(7);
+    expect(days[6].isToday).toBe(true);
+    expect(new Date(days[6].dayStart).getDate()).toBe(10);
+    expect(new Date(days[0].dayStart).getDate()).toBe(4);
+    expect(days.every((d) => d.status === 'operational')).toBe(true);
+  });
+
+  it('colors minor incidents like the header dot (degraded, not partial)', () => {
+    const inc = [{ impact: 'minor', started_at: localDay(8, 9), resolved_at: localDay(8, 10) }];
+    const days = shared.getDailyStatuses(inc, 'operational', NOW, 7);
+    expect(days[4].status).toBe('degraded_performance');
+    expect(days[3].status).toBe('operational');
+    expect(days[5].status).toBe('operational');
+  });
+
+  it('spans multi-day incidents and takes the worst per day', () => {
+    const inc = [
+      { impact: 'major', started_at: localDay(7, 22), resolved_at: localDay(8, 2) },
+      { impact: 'critical', started_at: localDay(8, 5), resolved_at: localDay(8, 6) },
+    ];
+    const days = shared.getDailyStatuses(inc, 'operational', NOW, 7);
+    expect(days[3].status).toBe('partial_outage');
+    expect(days[4].status).toBe('major_outage');
+  });
+
+  it('treats unresolved incidents as ongoing until now', () => {
+    const inc = [{ impact: 'minor', started_at: localDay(9, 20), resolved_at: null }];
+    const days = shared.getDailyStatuses(inc, 'operational', NOW, 7);
+    expect(days[5].status).toBe('degraded_performance');
+    expect(days[6].status).toBe('degraded_performance');
+  });
+
+  it('folds the live status into today only', () => {
+    const days = shared.getDailyStatuses([], 'partial_outage', NOW, 7);
+    expect(days[6].status).toBe('partial_outage');
+    expect(days[5].status).toBe('operational');
+  });
+
+  it('falls back to created_at when started_at is missing', () => {
+    const inc = [{ impact: 'minor', created_at: localDay(10, 8), resolved_at: localDay(10, 9) }];
+    expect(shared.getDailyStatuses(inc, 'operational', NOW, 7)[6].status).toBe('degraded_performance');
+  });
+});
+
+// ── getBadgeState ─────────────────────────────────────────
+
+describe('getBadgeState', () => {
+  const op = [{ name: 'API', status: 'operational' }];
+
+  it('is empty when everything is operational', () => {
+    expect(shared.getBadgeState({ components: op, incidents: [], indicator: 'none' }).text).toBe('');
+  });
+
+  it('marks a degraded component even without an incident', () => {
+    const b = shared.getBadgeState({
+      components: [{ name: 'API', status: 'degraded_performance' }], incidents: [], indicator: 'none',
+    });
+    expect(b.text).toBe('•');
+    expect(b.status).toBe('degraded_performance');
+    expect(b.color).toBe(shared.BADGE_COLORS.degraded_performance);
+  });
+
+  it('shows the incident count, colored by overall status', () => {
+    const b = shared.getBadgeState({ components: op, incidents: [{}, {}], indicator: 'critical' });
+    expect(b.text).toBe('2');
+    expect(b.color).toBe(shared.BADGE_COLORS.major_outage);
+  });
+
+  it('has a color for every status', () => {
+    for (const status of Object.keys(shared.STATUS_PRIORITY)) {
+      expect(shared.BADGE_COLORS[status]).toMatch(/^#[0-9a-f]{6}$/);
+    }
   });
 });
 

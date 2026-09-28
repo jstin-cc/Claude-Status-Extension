@@ -8,7 +8,7 @@ function P() {
   return UI_LABELS[currentLang].popup;
 }
 
-let currentLang = (navigator.language || 'en').toLowerCase().startsWith('de') ? 'de' : 'en';
+let currentLang = detectLang(navigator.language);
 let themeSetting = 'auto'; // 'auto' | 'dark' | 'light'
 let cachedResponse = null;
 
@@ -49,70 +49,39 @@ function formatTimeRange(fromStr, toStr) {
 
 // ── Render functions ─────────────────────────────────────────
 
+// Colors come from getDailyStatuses() via the same status enum as the
+// header dot, so chart and dot can never disagree about today.
 function renderUptimeChart(allIncidents, summaryData) {
   const L = P();
   const container = document.getElementById('p-uptime-bars');
   container.replaceChildren();
   container.setAttribute('aria-label', L.uptimeAria);
 
-  const COLOR_PRIORITY = { red: 4, orange: 3, yellow: 2, gray: 1, green: 0 };
-
-  // Map incident impact → color
-  function impactColor(impact) {
-    if (impact === 'critical' || impact === 'major') return 'red';
-    if (impact === 'minor') return 'orange';
-    return 'gray'; // maintenance / none
+  if (!allIncidents) {
+    container.appendChild(csmEl('div', 'p-empty', L.historyUnavailable));
+    return;
   }
 
-  const now = new Date();
+  const locale = currentLang === 'de' ? 'de-DE' : 'en-US';
+  const liveStatus = getOverallStatus(summaryData.components ?? [], summaryData.indicator);
+  const days = getDailyStatuses(allIncidents, liveStatus, Date.now(), CSM_CONFIG.HISTORY_DAYS);
 
-  for (let daysAgo = 6; daysAgo >= 0; daysAgo--) {
-    const day = new Date(now);
-    day.setUTCDate(now.getUTCDate() - daysAgo);
-    const dayStart = Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), day.getUTCDate());
-    const dayEnd   = dayStart + 86400000;
-
-    let color = 'green';
-
-    for (const inc of allIncidents) {
-      const incStart = new Date(inc.started_at).getTime();
-      const incEnd   = inc.resolved_at ? new Date(inc.resolved_at).getTime() : Date.now();
-      if (incStart < dayEnd && incEnd > dayStart) {
-        const c = impactColor(inc.impact);
-        if ((COLOR_PRIORITY[c] ?? 0) > (COLOR_PRIORITY[color] ?? 0)) color = c;
-      }
-    }
-
-    // For today also factor in live component status
-    if (daysAgo === 0) {
-      const compColor = STATUS_COLOR[getOverallStatus(summaryData.components ?? [], summaryData.indicator)] ?? 'gray';
-      if ((COLOR_PRIORITY[compColor] ?? 0) > (COLOR_PRIORITY[color] ?? 0)) color = compColor;
-    }
-
-    // Tooltip text
-    const dateLabel = new Date(dayStart).toLocaleDateString(
-      currentLang === 'de' ? 'de-DE' : 'en-US',
-      { day: '2-digit', month: '2-digit', timeZone: 'UTC' }
-    );
-    const S = SHARED_STATUS_LABELS[currentLang];
-    const statusLabel = {
-      green:  S.operational,
-      yellow: S.degraded_performance,
-      orange: S.partial_outage,
-      red:    S.major_outage,
-      gray:   S.under_maintenance,
-    }[color] ?? color;
+  for (const { dayStart, status, isToday } of days) {
+    const color = STATUS_COLOR[status] ?? 'gray';
+    const date = new Date(dayStart);
+    const dateLabel = date.toLocaleDateString(locale, { day: '2-digit', month: '2-digit' });
+    const statusLabel = SHARED_STATUS_LABELS[currentLang][status] ?? status;
 
     const wrapper = csmEl('div', 'p-uptime-bar-wrapper');
     const bar     = csmEl('div', `p-uptime-bar p-uptime-${color}`);
     bar.title = `${dateLabel}: ${statusLabel}`;
 
     const label = csmEl('span', 'p-uptime-label');
-    if (daysAgo === 0) {
+    if (isToday) {
       label.textContent = L.today;
       label.classList.add('p-uptime-today');
     } else {
-      label.textContent = L.dayNames[new Date(dayStart).getUTCDay()];
+      label.textContent = L.dayNames[date.getDay()];
     }
 
     wrapper.append(bar, label);
@@ -217,10 +186,14 @@ function renderHistory(allIncidents) {
   const container = document.getElementById('p-history');
   container.replaceChildren();
 
-  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
-  const recent = allIncidents
-    .filter((i) => i.status === 'resolved' && new Date(i.resolved_at).getTime() > sevenDaysAgo)
-    .slice(0, 5);
+  if (!allIncidents) {
+    container.appendChild(csmEl('div', 'p-empty', L.historyUnavailable));
+    return;
+  }
+
+  const recent = getRecentResolvedIncidents(
+    allIncidents, Date.now(), CSM_CONFIG.HISTORY_DAYS, CSM_CONFIG.HISTORY_LIMIT
+  );
 
   if (!recent.length) {
     container.appendChild(csmEl('div', 'p-empty', L.noHistory));
@@ -231,7 +204,7 @@ function renderHistory(allIncidents) {
     const row = csmEl('div', 'p-history-row');
 
     const durationMins = Math.round(
-      (new Date(inc.resolved_at).getTime() - new Date(inc.started_at).getTime()) / 60000
+      (new Date(inc.resolved_at).getTime() - new Date(inc.started_at ?? inc.created_at).getTime()) / 60000
     );
 
     const meta = csmEl('div', 'p-history-meta');
@@ -263,10 +236,11 @@ function renderAll(summaryData, allIncidents) {
   dotEl.setAttribute('aria-label', `Status: ${SHARED_STATUS_LABELS[currentLang][status] ?? status}`);
 
   renderComponents(components);
-  renderUptimeChart(allIncidents ?? [], summaryData);
+  // allIncidents === null → incidents.json failed; those sections say so
+  renderUptimeChart(allIncidents, summaryData);
   renderActiveIncidents(activeIncidents);
   renderScheduledMaintenance(maintenances);
-  renderHistory(allIncidents ?? []);
+  renderHistory(allIncidents);
 
   const { text, stale } = formatLastChecked(summaryData.fetchedAt ?? Date.now(), currentLang);
   const ts = document.getElementById('p-timestamp');
@@ -329,7 +303,7 @@ function requestAndRender() {
       return;
     }
     cachedResponse = response;
-    renderAll(response.summary ?? {}, response.incidents ?? []);
+    renderAll(response.summary ?? {}, response.incidents ?? null);
   });
 }
 
@@ -356,7 +330,9 @@ document.getElementById('p-refresh-btn').addEventListener('click', (e) => {
   const btn = e.currentTarget;
   btn.style.opacity = '0.5';
   btn.disabled = true;
-  chrome.runtime.sendMessage({ type: 'FORCE_FETCH' }, () => {
+  // Refresh means everything, incl. incident history (bypasses its TTL)
+  chrome.runtime.sendMessage({ type: 'FORCE_FETCH', incidents: true }, () => {
+    void chrome.runtime.lastError; // errors surface through requestAndRender()
     requestAndRender();
     btn.style.opacity = '1';
     btn.disabled = false;
@@ -367,7 +343,7 @@ document.getElementById('p-lang-btn').addEventListener('click', () => {
   currentLang = currentLang === 'de' ? 'en' : 'de';
   chrome.storage.local.set({ [STORAGE_KEYS.LANG]: currentLang });
   updateLangUI();
-  if (cachedResponse) renderAll(cachedResponse.summary ?? {}, cachedResponse.incidents ?? []);
+  if (cachedResponse) renderAll(cachedResponse.summary ?? {}, cachedResponse.incidents ?? null);
 });
 
 // Header button: quick explicit dark/light toggle. 'Auto' lives in settings.
@@ -448,7 +424,7 @@ document.getElementById('p-setting-lang').addEventListener('change', (e) => {
   currentLang = e.target.value;
   chrome.storage.local.set({ [STORAGE_KEYS.LANG]: currentLang });
   updateLangUI();
-  if (cachedResponse) renderAll(cachedResponse.summary ?? {}, cachedResponse.incidents ?? []);
+  if (cachedResponse) renderAll(cachedResponse.summary ?? {}, cachedResponse.incidents ?? null);
 });
 
 document.getElementById('p-setting-interval').addEventListener('change', (e) => {

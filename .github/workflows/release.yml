@@ -18,13 +18,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
-          node-version: 20
+          node-version: 24
+          cache: npm
 
-      - run: npm install
+      - run: npm ci
 
       - name: Lint & test
         run: |
@@ -32,7 +33,9 @@ jobs:
           npm test
 
       - name: Build & package
-        run: npm run build -- --zip
+        run: |
+          npm run build -- --zip
+          node scripts/verify-build.js
 
       - name: Create GitHub Release
         env:

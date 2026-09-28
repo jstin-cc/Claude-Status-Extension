@@ -1,6 +1,31 @@
 # Claude Status Monitor — Änderungsprotokoll
 
-**Stand: 2026-06-10 — v4.0 veröffentlicht.**
+**Stand: 2026-09-28 — v4.1 in Arbeit.**
+
+---
+
+## v4.1 (2026-09-28)
+
+Bugfixes, ruhigere Benachrichtigungen, weniger Berechtigungen.
+
+### Bugfixes
+- **Vorfälle mit Postmortem fehlten in der Historie**: Der Filter ließ nur `status === 'resolved'` durch, Statuspage setzt behobene Vorfälle mit Nachbericht aber auf `postmortem`. Gefiltert wird jetzt über `resolved_at`.
+- **Popup bleibt bei Ausfall von `incidents.json` nutzbar**: Komponenten und Gesamtstatus werden weiter angezeigt, nur Chart und Historie melden „nicht verfügbar“.
+- **Refresh-Button lädt jetzt auch die Vorfälle neu** (`FORCE_FETCH` mit `incidents: true` umgeht die 2-Minuten-TTL).
+- **Uptime-Chart und Status-Punkt widersprechen sich nicht mehr**: Incident-Impact läuft über dieselbe Zuordnung wie der Indicator (minor = gelb, major = orange, critical = rot). Die Tage sind jetzt lokale Kalendertage statt UTC.
+- **Verwaistes Widget nach Extension-Update** (Chrome): Das alte Content Script erkennt den ungültigen Kontext und entfernt sich, statt eingefrorene Daten zu zeigen.
+
+### Verbesserungen
+- **Badge folgt dem Gesamtstatus**: Anzahl bei Vorfällen, Punkt bei eingeschränkter Komponente ohne Vorfall; Tooltip am Icon nennt den Status (lokalisiert).
+- **Benachrichtigungen**: Änderungen müssen zwei Polls in Folge bestehen (keine Serien bei flatternden Komponenten); neue Meldungen ersetzen alte; Klick öffnet status.anthropic.com; alle Texte kommen aus `UI_LABELS`.
+- **Barrierefreiheit**: Der Ausklapp-Schalter des Widgets ist ein echter `<button>`, Sprach- und Theme-Button liegen nicht mehr darin verschachtelt.
+- **Berechtigung `tabs` entfernt**: Die Host-Berechtigung für claude.ai reicht; die Warnung „Browserverlauf lesen“ entfällt.
+- **Speicher**: Die Vorfall-Historie liegt unter eigenem Schlüssel (`csm-bg-incidents`), der Poll-Schreibvorgang bleibt klein.
+
+### Tooling
+- CI und Release auf Node 24, `npm ci`, Actions v5.
+- Build leert die Zielordner vorher; `scripts/verify-build.js` prüft Manifeste und referenzierte Dateien.
+- `getOverallColor()` (toter Code) entfernt; neue reine Helfer in `shared.js` mit Tests (85 statt 63).
 
 ---
 

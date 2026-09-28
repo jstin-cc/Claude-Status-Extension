@@ -19,6 +19,9 @@ const CSM_CONFIG = {
   CACHE_MAX_AGE_MS: 600000, // 10 min — storage.local warm-start cache
   INCIDENTS_TTL_MS: 120000, // 2 min — incidents.json is only fetched for the popup
   STALE_AFTER_MS: 300000,   // 5 min — data older than this is flagged as stale
+  NOTIFY_CONFIRM_POLLS: 2,  // a status change must be seen this often in a row before it notifies
+  HISTORY_DAYS: 7,          // popup uptime chart + resolved-incident history window
+  HISTORY_LIMIT: 5,         // max resolved incidents listed in the popup
 };
 
 const STORAGE_KEYS = {
@@ -29,6 +32,7 @@ const STORAGE_KEYS = {
   INTERVAL: 'csm-poll-interval',
   CACHE:    'csm-cache',          // storage.local — survives browser restart
   BG_STATE: 'csm-bg-state',       // storage.session — survives SW respawn only
+  BG_INCIDENTS: 'csm-bg-incidents', // storage.session — incidents.json cache, kept apart from BG_STATE
   WIDGET_VISIBLE: 'csm-widget-visible',
 };
 
@@ -70,8 +74,15 @@ function getOverallStatus(components, indicator) {
   return worst;
 }
 
-function getOverallColor(components) {
-  return STATUS_COLOR[getOverallStatus(components)] ?? 'gray';
+// Incident impact uses the same enum as the top-level indicator, so both
+// map through INDICATOR_STATUS — the status dot and the uptime chart can
+// never disagree about what "minor" or "major" means.
+function getImpactStatus(impact) {
+  return INDICATOR_STATUS[impact] ?? 'operational';
+}
+
+function worseStatus(a, b) {
+  return (STATUS_PRIORITY[b] ?? 0) > (STATUS_PRIORITY[a] ?? 0) ? b : a;
 }
 
 // Status-string comparisons for notifications — never compare colors.
@@ -82,6 +93,90 @@ function isWorseStatus(next, prev) {
 function isRecoveryStatus(next, prev) {
   return next === 'operational'
     && (STATUS_PRIORITY[prev] ?? 0) >= STATUS_PRIORITY.degraded_performance;
+}
+
+// Notification debounce. `baseline` is the status the user was last told
+// about (or saw on the first poll); a different status has to be observed
+// `confirmPolls` times in a row before it replaces the baseline, so a
+// single-poll blip or a flapping component never produces a burst of
+// notifications. Returns the next { baseline, pending } plus which
+// notification (if any) to show.
+function nextNotifyState(baseline, pending, observed, confirmPolls) {
+  if (baseline == null) return { baseline: observed, pending: null, notify: null };
+  if (observed === baseline) return { baseline, pending: null, notify: null };
+  const count = pending?.status === observed ? pending.count + 1 : 1;
+  if (count < (confirmPolls ?? 1)) {
+    return { baseline, pending: { status: observed, count }, notify: null };
+  }
+  let notify = null;
+  if (isWorseStatus(observed, baseline)) notify = 'worse';
+  else if (isRecoveryStatus(observed, baseline)) notify = 'recovery';
+  return { baseline: observed, pending: null, notify };
+}
+
+// ── Incident history (popup) ────────────────────────────────
+
+function incidentStart(inc) {
+  return new Date(inc.started_at ?? inc.created_at).getTime();
+}
+
+// Resolved incidents within the window, newest first. Filters on
+// resolved_at rather than status: Statuspage moves resolved incidents that
+// got a write-up to status 'postmortem', and those are usually the big ones.
+function getRecentResolvedIncidents(incidents, now, days, limit) {
+  const since = now - days * 86400000;
+  return (incidents ?? [])
+    .filter((i) => i.resolved_at && new Date(i.resolved_at).getTime() > since)
+    .sort((a, b) => new Date(b.resolved_at) - new Date(a.resolved_at))
+    .slice(0, limit);
+}
+
+// One entry per local calendar day, oldest first, ending today. Each day
+// takes the worst impact of every incident overlapping it; today also folds
+// in the live overall status. Local days so "today" matches the user's clock.
+function getDailyStatuses(incidents, liveStatus, now, days) {
+  const result = [];
+  const today = new Date(now);
+  for (let daysAgo = days - 1; daysAgo >= 0; daysAgo--) {
+    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate() - daysAgo).getTime();
+    const end = new Date(today.getFullYear(), today.getMonth(), today.getDate() - daysAgo + 1).getTime();
+    let status = 'operational';
+    for (const inc of incidents ?? []) {
+      const incStart = incidentStart(inc);
+      const incEnd = inc.resolved_at ? new Date(inc.resolved_at).getTime() : now;
+      if (incStart < end && incEnd > start) status = worseStatus(status, getImpactStatus(inc.impact));
+    }
+    if (daysAgo === 0 && liveStatus) status = worseStatus(status, liveStatus);
+    result.push({ dayStart: start, status, isToday: daysAgo === 0 });
+  }
+  return result;
+}
+
+// ── Toolbar badge ───────────────────────────────────────────
+// Reflects the overall status, not just incidents: a degraded component
+// without an incident still marks the icon. Count when incidents exist,
+// a dot otherwise, nothing when all is well.
+
+const BADGE_COLORS = {
+  major_outage: '#e05252',
+  partial_outage: '#e07a4f',
+  degraded_performance: '#d4a72c',
+  under_maintenance: '#8a877d',
+  operational: '#8a877d',
+};
+
+function getBadgeState(payload) {
+  const status = getOverallStatus(payload.components, payload.indicator);
+  const count = payload.incidents?.length ?? 0;
+  let text = '';
+  if (count) text = String(count);
+  else if (status !== 'operational') text = '•';
+  return {
+    status,
+    text,
+    color: BADGE_COLORS[status] ?? BADGE_COLORS.operational,
+    textColor: status === 'degraded_performance' ? '#1f1e1c' : '#ffffff',
+  };
 }
 
 // ── Payload contract ────────────────────────────────────────
@@ -215,6 +310,7 @@ const UI_LABELS = {
       noIncidents: 'Keine aktuellen Vorfälle',
       noMaintenance: 'Keine geplanten Wartungen',
       noHistory: 'Keine aufgelösten Vorfälle in den letzten 7 Tagen',
+      historyUnavailable: 'Verlauf gerade nicht verfügbar',
       uptimeHistory: '7-Tage-Verlauf',
       uptimeAria: 'Uptime-Verlauf der letzten 7 Tage',
       dayNames: ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'],
@@ -264,6 +360,16 @@ const UI_LABELS = {
       intervalDesc: 'Wie oft Status geprüft wird',
       intervals: { '0.5': '30 Sek.', '1': '1 Min.', '2': '2 Min.', '5': '5 Min.' },
     },
+    notify: {
+      title: 'Claude Status',
+      recovered: 'Alle Dienste wieder operational.',
+      incident: (name) => `Aktiver Vorfall: ${name}`,
+      status: (label) => `Dienststatus: ${label}`,
+    },
+    badge: {
+      title: (label) => `Claude Status: ${label}`,
+      error: (label) => `Claude Status: ${label}`,
+    },
   },
   en: {
     impact: { critical: 'Critical', major: 'Major', minor: 'Minor', maintenance: 'Maintenance', none: '' },
@@ -286,6 +392,7 @@ const UI_LABELS = {
       noIncidents: 'No active incidents',
       noMaintenance: 'No scheduled maintenance',
       noHistory: 'No resolved incidents in the last 7 days',
+      historyUnavailable: 'History currently unavailable',
       uptimeHistory: '7-Day History',
       uptimeAria: 'Uptime history of the last 7 days',
       dayNames: ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
@@ -335,8 +442,31 @@ const UI_LABELS = {
       intervalDesc: 'How often status is checked',
       intervals: { '0.5': '30 sec', '1': '1 min', '2': '2 min', '5': '5 min' },
     },
+    notify: {
+      title: 'Claude Status',
+      recovered: 'All services back to operational.',
+      incident: (name) => `Active incident: ${name}`,
+      status: (label) => `Service status: ${label}`,
+    },
+    badge: {
+      title: (label) => `Claude Status: ${label}`,
+      error: (label) => `Claude Status: ${label}`,
+    },
   },
 };
+
+// Notification text for a nextNotifyState() verdict ('worse' | 'recovery').
+function buildNotificationMessage(kind, status, incidents, lang) {
+  const L = UI_LABELS[lang] ?? UI_LABELS.en;
+  if (kind === 'recovery') return L.notify.recovered;
+  const incident = incidents?.[0];
+  if (incident) return L.notify.incident(incident.name);
+  return L.notify.status(SHARED_STATUS_LABELS[lang]?.[status] ?? status);
+}
+
+function detectLang(navLang) {
+  return (navLang || 'en').toLowerCase().startsWith('de') ? 'de' : 'en';
+}
 
 // ── DOM helpers ─────────────────────────────────────────────
 

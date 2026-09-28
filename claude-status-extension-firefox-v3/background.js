@@ -14,7 +14,10 @@ const ALARM_NAME = 'claude-status-poll';
 
 const sessionArea = chrome.storage.session ?? chrome.storage.local;
 
-// state: { lastStatus, consecutiveErrors, payload, incidents, incidentsFetchedAt }
+// state: { lastStatus, pendingStatus, consecutiveErrors, payload, incidents, incidentsFetchedAt }
+// lastStatus/pendingStatus drive the notification debounce (nextNotifyState).
+// incidents + incidentsFetchedAt live under their own key (BG_INCIDENTS) so
+// the per-poll write stays small; incidents.json is by far the biggest blob.
 let statePromise = null;
 
 function getState() {
@@ -23,13 +26,15 @@ function getState() {
 }
 
 async function loadState() {
-  const stored = await sessionArea.get(STORAGE_KEYS.BG_STATE);
-  const state = stored[STORAGE_KEYS.BG_STATE] ?? {
+  const stored = await sessionArea.get([STORAGE_KEYS.BG_STATE, STORAGE_KEYS.BG_INCIDENTS]);
+  const state = {
     lastStatus: null,
+    pendingStatus: null,
     consecutiveErrors: 0,
     payload: null,
-    incidents: null,
-    incidentsFetchedAt: 0,
+    ...stored[STORAGE_KEYS.BG_STATE],
+    incidents: stored[STORAGE_KEYS.BG_INCIDENTS]?.incidents ?? null,
+    incidentsFetchedAt: stored[STORAGE_KEYS.BG_INCIDENTS]?.fetchedAt ?? 0,
   };
   if (!state.payload) {
     // Warm start across browser restarts from the storage.local cache
@@ -42,7 +47,21 @@ async function loadState() {
 }
 
 async function persistState(state) {
-  await sessionArea.set({ [STORAGE_KEYS.BG_STATE]: state });
+  const { lastStatus, pendingStatus, consecutiveErrors, payload } = state;
+  await sessionArea.set({
+    [STORAGE_KEYS.BG_STATE]: { lastStatus, pendingStatus, consecutiveErrors, payload },
+  });
+}
+
+async function persistIncidents(state) {
+  await sessionArea.set({
+    [STORAGE_KEYS.BG_INCIDENTS]: { incidents: state.incidents, fetchedAt: state.incidentsFetchedAt },
+  });
+}
+
+async function getLang() {
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.LANG);
+  return stored[STORAGE_KEYS.LANG] ?? detectLang(navigator.language);
 }
 
 // ── Lifecycle ───────────────────────────────────────────────
@@ -80,7 +99,12 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 });
 
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && STORAGE_KEYS.INTERVAL in changes) setupAlarm();
+  if (area !== 'local') return;
+  if (STORAGE_KEYS.INTERVAL in changes) setupAlarm();
+  if (STORAGE_KEYS.LANG in changes) {
+    // Re-localize the toolbar tooltip right away
+    getState().then((state) => { if (state.payload) updateBadge(state.payload); });
+  }
 });
 
 // ── Offline / Online handling ───────────────────────────────
@@ -114,9 +138,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
   if (message?.type === 'FORCE_FETCH') {
-    fetchSummaryOnce()
-      .then(() => sendResponse({ ok: true }))
-      .catch(() => sendResponse({ ok: false }));
+    // { incidents: true } also bypasses the incidents TTL (popup refresh)
+    const jobs = [fetchSummaryOnce()];
+    if (message.incidents) jobs.push(fetchIncidentsOnce({ force: true }));
+    Promise.allSettled(jobs)
+      .then((results) => sendResponse({ ok: results.every((r) => r.status === 'fulfilled') }));
     return true;
   }
 });
@@ -140,13 +166,20 @@ async function handleGetStatus() {
 }
 
 async function handleGetSummary() {
+  let payload;
+  const state = await getState();
   try {
-    const state = await getState();
-    const payload = state.payload ?? await fetchSummaryOnce();
+    payload = state.payload ?? await fetchSummaryOnce();
+  } catch (err) {
+    return { error: true, code: err.code ?? ERROR_CODES.UNKNOWN };
+  }
+  // incidents.json only feeds the uptime chart and history — if it fails,
+  // the popup still shows the live summary and marks just those sections.
+  try {
     const incidents = await fetchIncidentsOnce();
     return { summary: payload, incidents, incidentsFetchedAt: state.incidentsFetchedAt };
   } catch (err) {
-    return { error: true, code: err.code ?? ERROR_CODES.UNKNOWN };
+    return { summary: payload, incidents: null, incidentsError: err.code ?? ERROR_CODES.UNKNOWN };
   }
 }
 
@@ -204,7 +237,7 @@ async function doFetchSummary() {
     await chrome.storage.local.set({ [STORAGE_KEYS.CACHE]: { payload } });
 
     broadcast({ type: 'STATUS_DATA', payload });
-    updateBadge(payload.incidents);
+    updateBadge(payload);
     if (hadErrors) await setupAlarm();
     return payload;
   } catch (err) {
@@ -212,9 +245,9 @@ async function doFetchSummary() {
     await persistState(state);
     await setupAlarm();
 
-    broadcast({ type: 'STATUS_ERROR', code: err.code ?? ERROR_CODES.UNKNOWN });
-    chrome.action.setBadgeText({ text: '!' });
-    chrome.action.setBadgeBackgroundColor({ color: '#8a877d' });
+    const code = err.code ?? ERROR_CODES.UNKNOWN;
+    broadcast({ type: 'STATUS_ERROR', code });
+    showErrorBadge(code);
     throw err;
   }
 }
@@ -223,21 +256,21 @@ async function doFetchSummary() {
 // demand with a short TTL instead of riding along on every poll.
 let inflightIncidents = null;
 
-function fetchIncidentsOnce() {
-  inflightIncidents ??= doFetchIncidents().finally(() => { inflightIncidents = null; });
+function fetchIncidentsOnce(opts) {
+  inflightIncidents ??= doFetchIncidents(opts?.force).finally(() => { inflightIncidents = null; });
   return inflightIncidents;
 }
 
-async function doFetchIncidents() {
+async function doFetchIncidents(force) {
   const state = await getState();
-  if (state.incidents && Date.now() - state.incidentsFetchedAt < CSM_CONFIG.INCIDENTS_TTL_MS) {
+  if (!force && state.incidents && Date.now() - state.incidentsFetchedAt < CSM_CONFIG.INCIDENTS_TTL_MS) {
     return state.incidents;
   }
   const json = await fetchJson('/incidents.json');
   if (!validateIncidents(json)) throw withCode(new Error('Invalid incidents: missing incidents array'), ERROR_CODES.PARSE);
   state.incidents = json.incidents;
   state.incidentsFetchedAt = Date.now();
-  await persistState(state);
+  await persistIncidents(state);
   return state.incidents;
 }
 
@@ -252,55 +285,55 @@ async function broadcast(message) {
 
 // ── Badge ───────────────────────────────────────────────────
 
-function updateBadge(activeIncidents) {
-  if (!activeIncidents.length) {
-    chrome.action.setBadgeText({ text: '' });
-    return;
-  }
-  const hasMajor = activeIncidents.some((i) => i.impact === 'major' || i.impact === 'critical');
-  chrome.action.setBadgeText({ text: String(activeIncidents.length) });
-  chrome.action.setBadgeBackgroundColor({ color: hasMajor ? '#e05252' : '#e07a4f' });
+async function updateBadge(payload) {
+  const badge = getBadgeState(payload);
+  chrome.action.setBadgeText({ text: badge.text });
+  chrome.action.setBadgeBackgroundColor({ color: badge.color });
+  chrome.action.setBadgeTextColor?.({ color: badge.textColor });
+  const lang = await getLang();
+  const label = SHARED_STATUS_LABELS[lang][badge.status] ?? badge.status;
+  chrome.action.setTitle({ title: UI_LABELS[lang].badge.title(label) });
+}
+
+async function showErrorBadge(code) {
+  chrome.action.setBadgeText({ text: '!' });
+  chrome.action.setBadgeBackgroundColor({ color: BADGE_COLORS.operational });
+  chrome.action.setBadgeTextColor?.({ color: '#ffffff' });
+  const lang = await getLang();
+  const label = ERROR_LABELS[lang][code] ?? ERROR_LABELS[lang].UNKNOWN;
+  chrome.action.setTitle({ title: UI_LABELS[lang].badge.error(label) });
 }
 
 // ── Notifications ───────────────────────────────────────────
 // Compares status strings end to end (never colors) via shared helpers.
 // The null baseline happens exactly once per browser session because
-// storage.session starts empty exactly once.
+// storage.session starts empty exactly once. A change has to hold for
+// NOTIFY_CONFIRM_POLLS consecutive polls before it notifies (flap guard).
+
+const NOTIFICATION_ID = 'csm-status';
 
 async function maybeNotify(state, payload) {
-  const newStatus = getOverallStatus(payload.components, payload.indicator);
-  const prev = state.lastStatus;
-  state.lastStatus = newStatus;
-  if (prev == null) return;
+  const observed = getOverallStatus(payload.components, payload.indicator);
+  const next = nextNotifyState(state.lastStatus, state.pendingStatus, observed, CSM_CONFIG.NOTIFY_CONFIRM_POLLS);
+  state.lastStatus = next.baseline;
+  state.pendingStatus = next.pending;
+  if (!next.notify) return;
 
-  const worsened = isWorseStatus(newStatus, prev);
-  const recovered = isRecoveryStatus(newStatus, prev);
-  if (!worsened && !recovered) return;
-
-  const stored = await chrome.storage.local.get([STORAGE_KEYS.NOTIFY, STORAGE_KEYS.LANG]);
+  const stored = await chrome.storage.local.get(STORAGE_KEYS.NOTIFY);
   if (!stored[STORAGE_KEYS.NOTIFY]) return;
 
-  const lang = stored[STORAGE_KEYS.LANG]
-    ?? ((navigator.language || 'en').toLowerCase().startsWith('de') ? 'de' : 'en');
-  let msg;
-
-  if (recovered) {
-    msg = lang === 'de'
-      ? 'Alle Dienste wieder operational.'
-      : 'All services back to operational.';
-  } else {
-    const incident = payload.incidents[0];
-    msg = incident
-      ? (lang === 'de' ? `Aktiver Vorfall: ${incident.name}` : `Active incident: ${incident.name}`)
-      : (lang === 'de'
-          ? `Dienststatus: ${SHARED_STATUS_LABELS.de[newStatus] ?? newStatus}`
-          : `Service status: ${SHARED_STATUS_LABELS.en[newStatus] ?? newStatus}`);
-  }
-
-  chrome.notifications.create({
+  const lang = await getLang();
+  // Fixed id: a newer status replaces the previous notification instead of stacking
+  chrome.notifications.create(NOTIFICATION_ID, {
     type: 'basic',
     iconUrl: 'icons/icon-48.png',
-    title: 'Claude Status',
-    message: msg,
+    title: UI_LABELS[lang].notify.title,
+    message: buildNotificationMessage(next.notify, observed, payload.incidents, lang),
   });
 }
+
+chrome.notifications.onClicked.addListener((id) => {
+  if (id !== NOTIFICATION_ID) return;
+  chrome.tabs.create({ url: 'https://status.anthropic.com' });
+  chrome.notifications.clear(id);
+});

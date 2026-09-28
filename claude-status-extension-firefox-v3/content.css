@@ -81,12 +81,11 @@
 }
 
 /* ── Header ─────────────────────────────────── */
+/* #csm-header is only the bar; the expand toggle (#csm-toggle) and the
+   lang/theme controls are sibling buttons inside it. */
 #csm-header {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 7px 12px;
-  cursor: pointer;
   background: var(--csm-header-bg);
   white-space: nowrap;
   border-radius: 14px; /* Pill when collapsed */
@@ -97,7 +96,24 @@
   background: var(--csm-header-hover);
 }
 
-#csm-header:focus-visible {
+#csm-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 7px 12px;
+  background: none;
+  border: none;
+  border-radius: inherit;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+#csm-toggle:focus-visible {
   outline: 2px solid var(--csm-accent);
   outline-offset: -2px;
 }
@@ -136,6 +152,7 @@
   align-items: center;
   gap: 2px;
   margin-left: auto;
+  padding-right: 6px;
 }
 
 #claude-status-widget.expanded #csm-header-controls {

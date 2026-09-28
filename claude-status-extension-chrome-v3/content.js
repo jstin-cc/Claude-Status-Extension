@@ -16,7 +16,7 @@
   }
 
   // Default to the browser locale; a stored choice overrides it below.
-  let currentLang = (navigator.language || 'en').toLowerCase().startsWith('de') ? 'de' : 'en';
+  let currentLang = detectLang(navigator.language);
   let themeSetting = 'auto'; // 'auto' (follow claude.ai) | 'dark' | 'light'
   let resolvedTheme = 'dark';
   let lastComponents = [];
@@ -42,8 +42,16 @@
   const headerControls = csmEl('div', '#csm-header-controls');
   headerControls.append(langBtn, themeBtn);
 
+  // The expand toggle is its own <button>; the lang/theme buttons sit next to
+  // it, never inside it (no nested interactive controls for screen readers).
+  const toggle = csmEl('button', '#csm-toggle');
+  toggle.type = 'button';
+  toggle.setAttribute('aria-expanded', 'false');
+  toggle.setAttribute('aria-controls', 'csm-body');
+  toggle.append(dot, title, chevron);
+
   const header = csmEl('div', '#csm-header');
-  header.append(dot, title, chevron, headerControls);
+  header.append(toggle, headerControls);
 
   // Body
   const incidentEl = csmEl('div', '#csm-incident');
@@ -66,13 +74,36 @@
 
   const widget = csmEl('div', '#claude-status-widget');
   widget.setAttribute('role', 'complementary');
-  header.setAttribute('role', 'button');
-  header.setAttribute('tabindex', '0');
-  header.setAttribute('aria-expanded', 'false');
   widget.append(header, body);
   document.body.appendChild(widget);
 
   const globalAC = new AbortController();
+
+  // ── Extension context ───────────────────────────────────────
+  // After an extension update/reload Chrome leaves this script running in
+  // open tabs, cut off from the extension (every chrome.* call throws
+  // "Extension context invalidated") and without re-injecting the new one.
+  // Such an orphan would show frozen data forever, so it removes itself;
+  // the cleanup observer below then tears everything down.
+
+  function contextAlive() {
+    try {
+      return !!chrome.runtime?.id;
+    } catch {
+      return false;
+    }
+  }
+
+  function removeIfOrphaned() {
+    if (contextAlive()) return false;
+    widget.remove();
+    return true;
+  }
+
+  function saveSetting(obj) {
+    if (removeIfOrphaned()) return;
+    chrome.storage.local.set(obj).catch(() => {});
+  }
 
   // ── SPA navigation watch ────────────────────────────────────
   // Patching history.pushState from the isolated world can never observe
@@ -153,7 +184,7 @@
     e.stopPropagation();
     const next = resolvedTheme === 'dark' ? 'light' : 'dark';
     applyTheme(next);
-    chrome.storage.local.set({ [STORAGE_KEYS.THEME]: next });
+    saveSetting({ [STORAGE_KEYS.THEME]: next });
   });
 
   // ── Language toggle ─────────────────────────────────────────
@@ -161,7 +192,7 @@
   langBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     currentLang = currentLang === 'de' ? 'en' : 'de';
-    chrome.storage.local.set({ [STORAGE_KEYS.LANG]: currentLang });
+    saveSetting({ [STORAGE_KEYS.LANG]: currentLang });
     updateLangUI();
     rerender();
   });
@@ -171,7 +202,7 @@
     langBtn.textContent = currentLang.toUpperCase();
     langBtn.setAttribute('aria-label', w.langAria);
     themeBtn.setAttribute('aria-label', w.themeAria);
-    header.setAttribute('aria-label', w.headerAria);
+    toggle.setAttribute('aria-label', w.headerAria);
     widget.setAttribute('aria-label', w.widgetAria);
     link.replaceChildren(document.createTextNode(w.details), csmIcon('external', 11));
     if (lastFetchedAt == null) timestampEl.textContent = w.loading;
@@ -190,13 +221,15 @@
       applyTheme(stored[STORAGE_KEYS.THEME] ?? 'auto');
       if (stored[STORAGE_KEYS.EXPANDED]) {
         widget.classList.add('expanded');
-        header.setAttribute('aria-expanded', 'true');
+        toggle.setAttribute('aria-expanded', 'true');
       }
     }
   );
 
   // Re-render only the timestamp so the displayed data age stays honest
+  // (and doubles as the orphan check)
   const tsTimer = setInterval(() => {
+    if (removeIfOrphaned()) return;
     if (!document.hidden) renderTimestamp();
   }, 30000);
 
@@ -204,7 +237,11 @@
   new MutationObserver((_, obs) => {
     if (!document.getElementById('claude-status-widget')) {
       globalAC.abort();
-      chrome.storage.onChanged.removeListener(onStorageChanged);
+      try {
+        chrome.storage.onChanged.removeListener(onStorageChanged);
+      } catch {
+        // context already invalidated — the listener died with it
+      }
       themeObserver.disconnect();
       if (navTimer) clearInterval(navTimer);
       clearInterval(tsTimer);
@@ -214,17 +251,12 @@
 
   // ── Expand / collapse ───────────────────────────────────────
 
-  header.addEventListener('click', (e) => {
+  // Native <button>: Enter/Space work without extra key handling
+  toggle.addEventListener('click', (e) => {
     e.stopPropagation();
-    if (e.target.closest('#csm-lang-btn') || e.target.closest('#csm-theme-btn')) return;
     const expanded = widget.classList.toggle('expanded');
-    header.setAttribute('aria-expanded', String(expanded));
-    chrome.storage.local.set({ [STORAGE_KEYS.EXPANDED]: expanded });
-  });
-
-  // Keyboard: Enter/Space toggle on header
-  header.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); header.click(); }
+    toggle.setAttribute('aria-expanded', String(expanded));
+    saveSetting({ [STORAGE_KEYS.EXPANDED]: expanded });
   });
 
   // ── Status rendering ────────────────────────────────────────
@@ -330,6 +362,10 @@
       });
     }, 5000);
 
+    if (removeIfOrphaned()) {
+      clearTimeout(timer);
+      return;
+    }
     chrome.runtime.sendMessage({ type: 'GET_STATUS' }, (response) => {
       const err = chrome.runtime.lastError; // always read, even when settled
       finish(() => {
